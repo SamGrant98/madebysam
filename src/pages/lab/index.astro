@@ -43,11 +43,13 @@ const experiments: { title: string; slug: string; note?: string }[] = [];
     font-size: clamp(2rem, 5vw, 3rem);
   }
   .lede {
-    color: var(--color-muted);
+    color: var(--color-fg);
+    opacity: 0.75;
   }
   .empty {
     font-family: var(--font-mono);
-    color: var(--color-muted);
+    color: var(--color-fg);
+    opacity: 0.6;
     padding: var(--space-4) 0;
   }
   .grid {
@@ -72,6 +74,7 @@ const experiments: { title: string; slug: string; note?: string }[] = [];
   }
   .card p {
     font-size: 0.9rem;
-    color: var(--color-muted);
+    color: var(--color-fg);
+    opacity: 0.7;
   }
 </style>

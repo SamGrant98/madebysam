@@ -118,8 +118,12 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
   resize();
   window.addEventListener('resize', resize);
 
-  const target = { x: 0, y: 0 };
-  const current = { x: 0, y: 0 };
+  // Start the peak off-screen (below the viewport) so the initial frame has
+  // no visible cursor hill — it'll glide in when the user first moves the mouse.
+  const offX = window.innerWidth * 0.5 * renderer.dpr;
+  const offY = -window.innerHeight * 0.6 * renderer.dpr;
+  const target = { x: offX, y: offY };
+  const current = { x: offX, y: offY };
   function onPointer(e: PointerEvent) {
     target.x = e.clientX * renderer.dpr;
     target.y = (window.innerHeight - e.clientY) * renderer.dpr;

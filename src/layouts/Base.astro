@@ -1,4 +1,5 @@
 ---
+import { ClientRouter } from 'astro:transitions';
 import ThemeToggle from '../components/ThemeToggle.astro';
 import TopoCanvas from '../components/TopoCanvas.astro';
 import '../styles/global.css';
@@ -35,10 +36,13 @@ const {
         document.documentElement.setAttribute('data-theme', theme);
       })();
     </script>
+
+    {/* Client-side routing so the topo canvas, WebGL state, and mouse position persist between pages */}
+    <ClientRouter />
   </head>
   <body>
     {showTopo && <TopoCanvas />}
-    <header class="site-header">
+    <header class="site-header" transition:persist="site-header">
       <a href="/" class="brand">made by sam</a>
       <nav>
         <a href="/about" class="underline">about</a>
@@ -63,8 +67,11 @@ const {
     justify-content: space-between;
     padding: var(--space-3) var(--space-4);
     z-index: 10;
-    mix-blend-mode: difference;
-    color: #fafafa;
+    color: var(--color-fg);
+    /* Soft halo in the bg color keeps text readable over topo lines */
+    text-shadow:
+      0 0 6px var(--color-bg),
+      0 0 14px var(--color-bg);
   }
 
   .brand {
@@ -83,5 +90,12 @@ const {
     position: relative;
     z-index: 1;
     min-height: 100vh;
+  }
+
+  /* Shared halo for readable text over the topo background */
+  main :where(h1, h2, h3, p) {
+    text-shadow:
+      0 0 10px var(--color-bg),
+      0 0 22px var(--color-bg);
   }
 </style>

@@ -34,13 +34,13 @@ import Base from '../layouts/Base.astro';
   h1 {
     font-size: clamp(2.25rem, 6vw, 4.25rem);
     max-width: 22ch;
-    mix-blend-mode: difference;
-    color: #fafafa;
+    color: var(--color-fg);
   }
   .lede {
     font-size: clamp(1rem, 1.5vw, 1.15rem);
     max-width: 42ch;
-    color: var(--color-muted);
+    color: var(--color-fg);
+    opacity: 0.75;
     margin-top: var(--space-2);
   }
 </style>

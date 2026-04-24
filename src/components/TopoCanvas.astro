@@ -3,7 +3,7 @@
 // The heavy lifting lives in ../scripts/topo.ts — this file is just the canvas + mount.
 ---
 
-<canvas id="topo-canvas" aria-hidden="true"></canvas>
+<canvas id="topo-canvas" aria-hidden="true" transition:persist="topo-canvas"></canvas>
 
 <style>
   #topo-canvas {
@@ -17,6 +17,15 @@
 
 <script>
   import { initTopoCanvas } from '../scripts/topo';
-  const canvas = document.getElementById('topo-canvas') as HTMLCanvasElement | null;
-  if (canvas) initTopoCanvas(canvas);
+
+  // Guard against double-init: the ClientRouter may re-run hoisted scripts on
+  // navigation, but we only want one renderer attached to the canvas.
+  const INIT_KEY = '__topoInitialised';
+  const canvas = document.getElementById('topo-canvas') as
+    | (HTMLCanvasElement & { [INIT_KEY]?: boolean })
+    | null;
+  if (canvas && !canvas[INIT_KEY]) {
+    canvas[INIT_KEY] = true;
+    initTopoCanvas(canvas);
+  }
 </script>

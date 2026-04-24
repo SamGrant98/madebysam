@@ -2,7 +2,7 @@
   --color-bg: #fafafa;
   --color-fg: #0a0a0a;
   --color-muted: #666666;
-  --color-accent: #0a0a0a;
+  --color-accent: #ff6b35;
   --font-sans:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
     Cantarell, 'Helvetica Neue', sans-serif;
@@ -22,7 +22,7 @@
   --color-bg: #0a0a0a;
   --color-fg: #fafafa;
   --color-muted: #888888;
-  --color-accent: #fafafa;
+  /* accent stays the same hue across themes — orange reads on both */
 }
 
 *,
@@ -78,6 +78,14 @@ a.underline::after {
 
 a.underline:hover::after {
   transform: scaleX(1);
+  background: var(--color-accent);
+}
+
+/* Accessible focus ring uses the accent so keyboard nav is obvious */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: 2px;
 }
 
 button {
@@ -102,6 +110,19 @@ pre {
 }
 
 ::selection {
-  background: var(--color-fg);
+  background: var(--color-accent);
   color: var(--color-bg);
+}
+
+/* Touch devices: kill page scroll + native gestures so the canvas owns the
+   touch input. Without this, dragging on the topo just scrolls the page
+   instead of moving the contour peak. */
+@media (pointer: coarse) {
+  html,
+  body {
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
+    height: 100%;
+  }
 }

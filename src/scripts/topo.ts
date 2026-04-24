@@ -16,7 +16,6 @@ const fragment = /* glsl */ `
   uniform vec3  uBg;
   uniform vec3  uLine;
 
-  // IQ-style value noise
   vec2 hash2(vec2 p) {
     p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
     return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
@@ -35,7 +34,6 @@ const fragment = /* glsl */ `
     );
   }
 
-  // Fractal brownian motion — stacks noise octaves for organic shapes
   float fbm(vec2 p) {
     float v = 0.0;
     float a = 0.5;
@@ -52,24 +50,21 @@ const fragment = /* glsl */ `
     vec2 uv = (gl_FragCoord.xy - 0.5 * res) / min(res.x, res.y);
     vec2 mouse = (uMouse - 0.5 * res) / min(res.x, res.y);
 
-    // Mouse warps the noise field — stronger near the cursor, fades with distance
     vec2 toMouse = uv - mouse;
     float d = length(toMouse);
     float warpAmt = 0.35 / (1.0 + d * d * 10.0);
     uv -= normalize(toMouse + 1e-6) * warpAmt;
 
-    // Slow drift so the map is never fully still
     uv += vec2(uTime * 0.015, uTime * 0.008);
 
     float n = fbm(uv * 2.2);
 
-    // fract() turns smooth noise into repeating bands — the contour trick
     float bands = 9.0;
     float v = fract(n * bands);
     float edge = min(v, 1.0 - v);
 
-    // Antialiased line via fwidth — keeps lines crisp at any DPR
-    float aa = fwidth(n * bands) * 1.4;
+    // Resolution-derived AA — no derivatives needed (WebGL1 safe)
+    float aa = bands / min(res.x, res.y) * 2.5;
     float line = 1.0 - smoothstep(0.0, aa, edge);
 
     vec3 col = mix(uBg, uLine, line);
@@ -77,9 +72,9 @@ const fragment = /* glsl */ `
   }
 `;
 
-function hexToRgb(hex: string): [number, number, number] {
+function hexToRgb(hex: string): [number, number, number] | null {
   const h = hex.replace('#', '').trim();
-  if (h.length < 6) return [0, 0, 0];
+  if (h.length < 6) return null;
   return [
     parseInt(h.slice(0, 2), 16) / 255,
     parseInt(h.slice(2, 4), 16) / 255,
@@ -101,31 +96,29 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
     vertex,
     fragment,
     uniforms: {
-      uResolution: { value: [canvas.clientWidth, canvas.clientHeight] },
+      uResolution: { value: [window.innerWidth, window.innerHeight] },
       uMouse: { value: [0, 0] },
       uTime: { value: 0 },
-      uBg: { value: [1, 1, 1] },
-      uLine: { value: [0, 0, 0] },
+      uBg: { value: [0, 0, 0] },
+      uLine: { value: [1, 1, 1] },
     },
   });
   const mesh = new Mesh(gl, { geometry, program });
 
   function resize() {
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
     renderer.setSize(w, h);
     program.uniforms.uResolution.value = [w * renderer.dpr, h * renderer.dpr];
   }
   resize();
   window.addEventListener('resize', resize);
 
-  // Smoothed mouse — the raw position is target, `current` is what the shader uses
   const target = { x: 0, y: 0 };
   const current = { x: 0, y: 0 };
-
   function onPointer(e: PointerEvent) {
     target.x = e.clientX * renderer.dpr;
-    target.y = (window.innerHeight - e.clientY) * renderer.dpr; // flip Y for GL coords
+    target.y = (window.innerHeight - e.clientY) * renderer.dpr;
   }
   window.addEventListener('pointermove', onPointer);
 
@@ -134,8 +127,8 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
     const styles = getComputedStyle(document.documentElement);
     const bg = hexToRgb(styles.getPropertyValue('--color-bg'));
     const line = hexToRgb(styles.getPropertyValue('--color-fg'));
-    program.uniforms.uBg.value = bg;
-    program.uniforms.uLine.value = line;
+    if (bg) program.uniforms.uBg.value = bg;
+    if (line) program.uniforms.uLine.value = line;
   }
   readColors();
 

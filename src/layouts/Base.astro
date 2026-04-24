@@ -1,0 +1,87 @@
+---
+import ThemeToggle from '../components/ThemeToggle.astro';
+import TopoCanvas from '../components/TopoCanvas.astro';
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+  showTopo?: boolean;
+}
+
+const {
+  title = 'made by sam',
+  description = 'Personal site & creative web experiments by Sam Grant.',
+  showTopo = true,
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+
+    {/* No-flash theme script — runs before paint to avoid a light/dark flicker */}
+    <script is:inline>
+      (function () {
+        const stored = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = stored || (prefersDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
+  </head>
+  <body>
+    {showTopo && <TopoCanvas />}
+    <header class="site-header">
+      <a href="/" class="brand">made by sam</a>
+      <nav>
+        <a href="/about" class="underline">about</a>
+        <a href="/lab" class="underline">lab</a>
+        <ThemeToggle />
+      </nav>
+    </header>
+    <main>
+      <slot />
+    </main>
+  </body>
+</html>
+
+<style>
+  .site-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+    z-index: 10;
+    mix-blend-mode: difference;
+    color: #fafafa;
+  }
+
+  .brand {
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+
+  nav {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: 0.95rem;
+  }
+
+  main {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+  }
+</style>

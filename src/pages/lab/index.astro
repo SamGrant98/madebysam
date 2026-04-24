@@ -1,0 +1,77 @@
+---
+import Base from '../../layouts/Base.astro';
+
+// When you add an experiment, drop a new entry here.
+// Each one can live at its own route (e.g. src/pages/lab/topo-v2.astro).
+const experiments: { title: string; slug: string; note?: string }[] = [];
+---
+
+<Base title="lab — made by sam">
+  <section class="lab">
+    <h1>Lab</h1>
+    <p class="lede">A place to play. Experiments from the Obsidian vault, in public.</p>
+
+    {
+      experiments.length === 0 ? (
+        <p class="empty">Nothing here yet — come back soon.</p>
+      ) : (
+        <ul class="grid">
+          {experiments.map((x) => (
+            <li>
+              <a href={`/lab/${x.slug}`} class="card">
+                <h3>{x.title}</h3>
+                {x.note && <p>{x.note}</p>}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </section>
+</Base>
+
+<style>
+  .lab {
+    max-width: 56rem;
+    margin: 0 auto;
+    padding: calc(var(--space-8) * 1.5) var(--space-4) var(--space-8);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  h1 {
+    font-size: clamp(2rem, 5vw, 3rem);
+  }
+  .lede {
+    color: var(--color-muted);
+  }
+  .empty {
+    font-family: var(--font-mono);
+    color: var(--color-muted);
+    padding: var(--space-4) 0;
+  }
+  .grid {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    gap: var(--space-2);
+  }
+  .card {
+    display: block;
+    padding: var(--space-3);
+    border: 1px solid color-mix(in oklab, var(--color-fg) 15%, transparent);
+    border-radius: var(--radius);
+    transition: border-color var(--transition);
+  }
+  .card:hover {
+    border-color: var(--color-fg);
+  }
+  .card h3 {
+    font-size: 1.05rem;
+    margin-bottom: var(--space-1);
+  }
+  .card p {
+    font-size: 0.9rem;
+    color: var(--color-muted);
+  }
+</style>

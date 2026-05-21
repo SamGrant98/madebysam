@@ -67,6 +67,13 @@ const categoryLabels: Record<Category, string> = {
   'audio': 'Audio',
   'tools': 'Tools',
 };
+
+// Peak positions handed to the topo shader so each landmark sits on its own
+// hill, making the contour lines read as a real map. Only entries with an
+// explicit mapPosition contribute.
+const topoPeaks = experiments
+  .filter((e) => e.mapPosition)
+  .map((e) => ({ x: e.mapPosition!.x, y: e.mapPosition!.y }));
 ---
 
 <Base title="lab — made by sam">
@@ -384,18 +391,17 @@ const categoryLabels: Record<Category, string> = {
   }
 </style>
 
-<script>
-  // Mode toggle: map / list. Default chosen by environment — list on
-  // reduced-motion OR coarse-pointer (mobile) so the page is usable
-  // without a precise pointer. Choice is persisted to localStorage so a
-  // user's explicit pick wins next visit.
+<script define:vars={{ topoPeaks }}>
+  // ----- Map / List mode toggle -----
+  // Default chosen by environment (reduced-motion + coarse-pointer fall back
+  // to list). Explicit user choice persists via localStorage.
   function initLab() {
-    const section = document.querySelector<HTMLElement>('.lab');
+    const section = document.querySelector('.lab');
     if (!section) return;
     const toggle = section.querySelector('.mode-toggle');
-    const btns = section.querySelectorAll<HTMLButtonElement>('.mode-btn');
+    const btns = section.querySelectorAll('.mode-btn');
 
-    function getInitialMode(): 'map' | 'list' {
+    function getInitialMode() {
       try {
         const stored = localStorage.getItem('lab-mode');
         if (stored === 'map' || stored === 'list') return stored;
@@ -405,19 +411,23 @@ const categoryLabels: Record<Category, string> = {
       return 'map';
     }
 
-    function applyMode(mode: 'map' | 'list') {
-      section!.setAttribute('data-mode', mode);
+    function applyMode(mode) {
+      section.setAttribute('data-mode', mode);
       btns.forEach((b) => {
         const isActive = b.getAttribute('data-mode') === mode;
         b.classList.toggle('is-active', isActive);
         b.setAttribute('aria-selected', isActive ? 'true' : 'false');
       });
+      // When listing, return the topo to mouse-follow so it doesn't look
+      // mysteriously frozen behind the cards. When mapping, lock peaks
+      // under the landmarks.
+      syncTopoToMode(mode);
     }
 
     applyMode(getInitialMode());
 
     toggle?.addEventListener('click', (e) => {
-      const btn = (e.target as HTMLElement)?.closest<HTMLButtonElement>('.mode-btn');
+      const btn = e.target?.closest('.mode-btn');
       if (!btn) return;
       const mode = btn.getAttribute('data-mode');
       if (mode !== 'map' && mode !== 'list') return;
@@ -426,6 +436,35 @@ const categoryLabels: Record<Category, string> = {
     });
   }
 
-  document.addEventListener('astro:page-load', initLab);
-  initLab();
+  // ----- Topo binding -----
+  // When the lab is in map mode, ask the topo shader to lock its peaks at
+  // each landmark's normalised viewport coords. When leaving the lab page
+  // (or switching to list), restore mouse-follow.
+  function syncTopoToMode(mode) {
+    if (!window.__topo) return;
+    if (mode === 'map') {
+      window.__topo.setMode('locked', topoPeaks);
+    } else {
+      window.__topo.setMode('follow');
+    }
+  }
+
+  function onPageLoad() {
+    // Only initLab when we're actually on the /lab page (handler is global,
+    // fires on every ClientRouter swap)
+    if (location.pathname.startsWith('/lab')) {
+      initLab();
+    } else {
+      // Leaving lab — restore mouse-follow regardless of what the lab page
+      // had it set to.
+      window.__topo?.setMode('follow');
+    }
+  }
+
+  // Register once, idempotent across navigations
+  if (!window.__labPageListener) {
+    window.__labPageListener = true;
+    document.addEventListener('astro:page-load', onPageLoad);
+  }
+  onPageLoad();
 </script>

@@ -1,5 +1,16 @@
 import { Renderer, Program, Mesh, Triangle } from 'ogl';
 
+// Multi-peak topo shader. Up to MAX_PEAKS hills contribute elevation to the
+// noise field. Two modes:
+//   'follow' — single peak target tracks the mouse (original behaviour)
+//   'locked' — N peaks fixed at caller-provided normalised viewport coords
+//              (used by /lab to anchor the terrain into a map)
+//
+// Switching modes is smooth because each peak's screen position lerps from
+// its current value to its new target every frame; no jump cuts.
+
+const MAX_PEAKS = 8;
+
 const vertex = /* glsl */ `
   attribute vec2 position;
   void main() {
@@ -11,10 +22,14 @@ const fragment = /* glsl */ `
   precision highp float;
 
   uniform vec2  uResolution;
-  uniform vec2  uMouse;
   uniform float uTime;
   uniform vec3  uBg;
   uniform vec3  uLine;
+
+  const int MAX_PEAKS = ${MAX_PEAKS};
+  uniform vec2  uPeaks[MAX_PEAKS];   // peak positions in screen-pixel space
+  uniform int   uPeakCount;          // how many of the array slots are active
+  uniform float uPeakStrength;       // per-peak elevation multiplier
 
   vec2 hash2(vec2 p) {
     p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
@@ -34,8 +49,7 @@ const fragment = /* glsl */ `
     );
   }
 
-  // Rotating each octave breaks up axis-aligned artifacts → organic flowing curves
-  const mat2 kRot = mat2(0.8775826, 0.4794255, -0.4794255, 0.8775826); // ~27.5° rotation
+  const mat2 kRot = mat2(0.8775826, 0.4794255, -0.4794255, 0.8775826);
   float fbm(vec2 p) {
     float v = 0.0;
     float a = 0.5;
@@ -50,25 +64,28 @@ const fragment = /* glsl */ `
   void main() {
     vec2 res = uResolution;
     vec2 uv = (gl_FragCoord.xy - 0.5 * res) / min(res.x, res.y);
-    vec2 mouse = (uMouse - 0.5 * res) / min(res.x, res.y);
 
     // Base terrain — static fbm noise field
     float h = fbm(uv * 1.5);
 
-    // Cursor adds a soft elevation peak so contour lines form rings around it
-    float dist = length(uv - mouse);
-    float peakShape = 1.0 / (1.0 + dist * dist * 8.0); // 0..1, 1 at cursor
-    h += 0.6 * peakShape;
+    // Accumulate elevation from each active peak. Track the strongest
+    // single-peak influence for adaptive AA.
+    float maxPeakShape = 0.0;
+    for (int i = 0; i < MAX_PEAKS; i++) {
+      if (i >= uPeakCount) break;
+      vec2 peakUv = (uPeaks[i] - 0.5 * res) / min(res.x, res.y);
+      float dist = length(uv - peakUv);
+      float peakShape = 1.0 / (1.0 + dist * dist * 8.0);
+      h += 0.55 * uPeakStrength * peakShape;
+      maxPeakShape = max(maxPeakShape, peakShape);
+    }
 
-    // fract() → repeating bands → contour lines
     float bands = 8.0;
     float v = fract(h * bands);
     float edge = min(v, 1.0 - v);
 
-    // Adaptive AA — baseline tight AA for crisp lines, wider near the cursor
-    // where rings crowd together. Pure math, no derivatives required.
     float baseAA = bands / min(res.x, res.y) * 1.5;
-    float aa = baseAA * (1.0 + peakShape * 4.0);
+    float aa = baseAA * (1.0 + maxPeakShape * uPeakStrength * 4.0);
     float line = 1.0 - smoothstep(0.0, aa, edge);
 
     vec3 col = mix(uBg, uLine, line);
@@ -86,6 +103,22 @@ function hexToRgb(hex: string): [number, number, number] | null {
   ];
 }
 
+type Mode = 'follow' | 'locked';
+type Peak = { target: [number, number]; current: [number, number] };
+type NormPos = { x: number; y: number };
+
+// Exposed controller. /lab calls setMode('locked') with peak positions; other
+// pages can call setMode('follow') to return to the cursor-tracking behaviour.
+export interface TopoController {
+  setMode(mode: Mode, peaks?: NormPos[]): void;
+  setPeaks(peaks: NormPos[]): void;
+}
+
+declare global {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
+  interface Window { __topo?: TopoController; }
+}
+
 export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
   const renderer = new Renderer({
     canvas,
@@ -101,10 +134,12 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
     fragment,
     uniforms: {
       uResolution: { value: [window.innerWidth, window.innerHeight] },
-      uMouse: { value: [0, 0] },
       uTime: { value: 0 },
       uBg: { value: [0, 0, 0] },
       uLine: { value: [1, 1, 1] },
+      uPeaks: { value: new Array(MAX_PEAKS * 2).fill(0) },
+      uPeakCount: { value: 0 },
+      uPeakStrength: { value: 1.0 },
     },
   });
   const mesh = new Mesh(gl, { geometry, program });
@@ -118,19 +153,65 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
   resize();
   window.addEventListener('resize', resize);
 
-  // Start the peak off-screen (below the viewport) so the initial frame has
-  // no visible cursor hill — it'll glide in when the user first moves the mouse.
-  const offX = window.innerWidth * 0.5 * renderer.dpr;
-  const offY = -window.innerHeight * 0.6 * renderer.dpr;
-  const target = { x: offX, y: offY };
-  const current = { x: offX, y: offY };
+  // ----- Peak state -----
+  // In follow mode there is exactly one peak whose target tracks the mouse.
+  // In locked mode there are N peaks whose targets are caller-provided
+  // normalised viewport coords (x, y in 0..1, y measured from the TOP).
+  let mode: Mode = 'follow';
+  const peaks: Peak[] = [];
+  let lockedPositions: NormPos[] = [];
+
+  // Start the mouse-tracking peak off-screen below the viewport so the
+  // first paint doesn't show a hill where the cursor hasn't arrived yet.
+  const initialOff = [
+    window.innerWidth * 0.5 * renderer.dpr,
+    -window.innerHeight * 0.6 * renderer.dpr,
+  ] as [number, number];
+  peaks.push({ target: [...initialOff], current: [...initialOff] });
+
+  const mouseTarget: [number, number] = [...initialOff];
   function onPointer(e: PointerEvent) {
-    target.x = e.clientX * renderer.dpr;
-    target.y = (window.innerHeight - e.clientY) * renderer.dpr;
+    mouseTarget[0] = e.clientX * renderer.dpr;
+    mouseTarget[1] = (window.innerHeight - e.clientY) * renderer.dpr;
   }
   window.addEventListener('pointermove', onPointer);
 
-  // Pull theme colors from CSS custom properties so the shader follows light/dark
+  // Normalised (0..1, top-down) → screen pixel space the shader expects
+  function denorm(p: NormPos): [number, number] {
+    return [
+      p.x * window.innerWidth * renderer.dpr,
+      (1 - p.y) * window.innerHeight * renderer.dpr,
+    ];
+  }
+
+  function setMode(next: Mode, newPeaks?: NormPos[]) {
+    mode = next;
+    if (next === 'locked') {
+      if (newPeaks) lockedPositions = newPeaks.slice();
+      // New peaks emerge from wherever the existing first peak currently is
+      // (typically the cursor) and disperse to their target positions.
+      const spawn = peaks[0]?.current ?? initialOff;
+      const targets = lockedPositions.map(denorm);
+      peaks.length = 0;
+      for (const target of targets) {
+        peaks.push({ target, current: [...spawn] });
+      }
+    } else {
+      // follow mode — single peak; inherits current value from peaks[0] so
+      // the morph back is smooth.
+      const spawn = peaks[0]?.current ?? [...initialOff];
+      peaks.length = 0;
+      peaks.push({ target: [...mouseTarget], current: spawn });
+    }
+  }
+
+  function setPeaks(newPeaks: NormPos[]) {
+    setMode('locked', newPeaks);
+  }
+
+  window.__topo = { setMode, setPeaks };
+
+  // Theme colours sync from CSS custom props (follows light/dark)
   function readColors() {
     const styles = getComputedStyle(document.documentElement);
     const bg = hexToRgb(styles.getPropertyValue('--color-bg'));
@@ -148,12 +229,44 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
 
   const start = performance.now();
   let rafId = 0;
+  const peakUniform = new Array(MAX_PEAKS * 2).fill(0) as number[];
+
   function loop() {
-    // Low lerp factor → smooth, gliding cursor pursuit
-    current.x += (target.x - current.x) * 0.045;
-    current.y += (target.y - current.y) * 0.045;
-    program.uniforms.uMouse.value = [current.x, current.y];
+    // Refresh targets every frame:
+    //  - follow → peak 0 tracks the mouse
+    //  - locked → all peaks re-derive their target from normalised coords
+    //             (so resize stays correct without explicit re-call)
+    if (mode === 'follow' && peaks.length > 0) {
+      peaks[0].target[0] = mouseTarget[0];
+      peaks[0].target[1] = mouseTarget[1];
+    } else if (mode === 'locked') {
+      for (let i = 0; i < peaks.length && i < lockedPositions.length; i++) {
+        const t = denorm(lockedPositions[i]);
+        peaks[i].target[0] = t[0];
+        peaks[i].target[1] = t[1];
+      }
+    }
+
+    // Low lerp factor → smooth gliding pursuit (same feel as the original)
+    for (const p of peaks) {
+      p.current[0] += (p.target[0] - p.current[0]) * 0.045;
+      p.current[1] += (p.target[1] - p.current[1]) * 0.045;
+    }
+
+    // Pack peak positions into the flat uniform array
+    for (let i = 0; i < MAX_PEAKS; i++) {
+      if (i < peaks.length) {
+        peakUniform[i * 2] = peaks[i].current[0];
+        peakUniform[i * 2 + 1] = peaks[i].current[1];
+      } else {
+        peakUniform[i * 2] = 0;
+        peakUniform[i * 2 + 1] = 0;
+      }
+    }
+    program.uniforms.uPeaks.value = peakUniform;
+    program.uniforms.uPeakCount.value = Math.min(peaks.length, MAX_PEAKS);
     program.uniforms.uTime.value = (performance.now() - start) / 1000;
+
     renderer.render({ scene: mesh });
     rafId = requestAnimationFrame(loop);
   }
@@ -164,5 +277,8 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
     window.removeEventListener('resize', resize);
     window.removeEventListener('pointermove', onPointer);
     themeObserver.disconnect();
+    if (window.__topo === (window.__topo as TopoController | undefined)) {
+      delete window.__topo;
+    }
   };
 }

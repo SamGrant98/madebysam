@@ -28,4 +28,15 @@
     canvas[INIT_KEY] = true;
     initTopoCanvas(canvas);
   }
+
+  // Per-page topo mode sync. /lab sets its own network mode via its own
+  // page-load listener; every other page falls back to mouse-follow so we
+  // don't carry the network into home/about when navigating back.
+  function syncTopoMode() {
+    const path = window.location.pathname.replace(/\/+$/, '') || '/';
+    if (path === '/lab') return;
+    window.__topo?.setMode('follow');
+  }
+  document.addEventListener('astro:page-load', syncTopoMode);
+  syncTopoMode();
 </script>

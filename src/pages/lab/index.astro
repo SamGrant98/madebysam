@@ -1,15 +1,9 @@
 ---
 import Base from '../../layouts/Base.astro';
 
-// Lab entries — one shipped (DVD Shelf) and a few sketches so the map has
-// something to populate. Edit titles, blurbs, categories and mapPosition
-// freely. mapPosition uses normalised viewport coords (0..1 each axis).
-//
-// status:
-//   'live'      — actually deployed, clickable, navigates to href/slug
-//   'sketching' — in progress / planned, dimmed, not clickable
-//   'parked'    — backburner, greyed further
-
+// Each experiment is a node on the map. mapPosition.{x,y} are normalised
+// viewport coords (0..1, y measured from the TOP). Edit freely; the shader
+// will follow.
 type Category = 'three-d' | 'generative' | 'data' | 'audio' | 'tools';
 type Status = 'live' | 'sketching' | 'parked';
 
@@ -21,7 +15,7 @@ interface Experiment {
   category: Category;
   status: Status;
   note?: string;
-  mapPosition?: { x: number; y: number };
+  mapPosition: { x: number; y: number };
 }
 
 const experiments: Experiment[] = [
@@ -31,24 +25,16 @@ const experiments: Experiment[] = [
     href: 'https://dvd.madebysam.dev',
     category: 'three-d',
     status: 'live',
-    note: 'A 3D shelf for your physical media — drop in a CSV, browse in space.',
-    mapPosition: { x: 0.72, y: 0.34 },
+    note: 'A 3D shelf for your physical media. Drop in a CSV, browse in space.',
+    mapPosition: { x: 0.75, y: 0.34 },
   },
   {
     id: 'topo-playground',
     title: 'Topo Playground',
     category: 'generative',
     status: 'sketching',
-    note: 'Configurable contour-map generator. Same shader as this background, with knobs.',
-    mapPosition: { x: 0.26, y: 0.3 },
-  },
-  {
-    id: 'audio-reactive',
-    title: 'Audio Reactive',
-    category: 'audio',
-    status: 'sketching',
-    note: 'Mic input drives a shader — volume, frequency, beat.',
-    mapPosition: { x: 0.22, y: 0.66 },
+    note: 'Same shader as this background, with knobs.',
+    mapPosition: { x: 0.24, y: 0.46 },
   },
   {
     id: 'palette-generator',
@@ -56,8 +42,25 @@ const experiments: Experiment[] = [
     category: 'tools',
     status: 'sketching',
     note: 'Throw a photo at it, get a colour system out.',
-    mapPosition: { x: 0.74, y: 0.7 },
+    mapPosition: { x: 0.78, y: 0.72 },
   },
+  {
+    id: 'audio-reactive',
+    title: 'Audio Reactive',
+    category: 'audio',
+    status: 'sketching',
+    note: 'Mic input drives a shader — volume, frequency, beat.',
+    mapPosition: { x: 0.4, y: 0.8 },
+  },
+];
+
+// Edges of the network. Each pair is a path drawn between the two nodes.
+const connections: [string, string][] = [
+  ['dvd-shelf', 'topo-playground'],
+  ['dvd-shelf', 'palette-generator'],
+  ['topo-playground', 'audio-reactive'],
+  ['palette-generator', 'audio-reactive'],
+  ['topo-playground', 'palette-generator'],
 ];
 
 const categoryLabels: Record<Category, string> = {
@@ -68,454 +71,195 @@ const categoryLabels: Record<Category, string> = {
   'tools': 'Tools',
 };
 
-// Wide central "mountain" + a small hill under each landmark so the
-// terrain reads as a real map. Falloff: lower = wider peak. Strength:
-// the per-peak elevation multiplier.
-//   central:  wide and dominant by coverage (falloff 3.5, strength 0.8)
-//   landmark: narrow but with enough strength to form their own visible
-//             rings against the central peak's slope (falloff 22,
-//             strength 0.6)
-// Central peak gives the broader topology — rings spanning the viewport.
-// Landmark peaks are SHARP (high falloff) so their local gradient dominates
-// the central peak's pull near each landmark — meaning the local maximum
-// stays at (or within ~5px of) the landmark's coordinate, so the dot lands
-// inside its ring nest.
-const topoPeaks = [
-  { x: 0.5, y: 0.5, falloff: 3.5, strength: 0.4 },
-  ...experiments
-    .filter((e) => e.mapPosition)
-    .map((e) => ({
-      x: e.mapPosition!.x,
-      y: e.mapPosition!.y,
-      falloff: 60,
-      strength: 0.7,
-    })),
-];
-const topoStrength = 1.0;
+// Serialise data for the in-page script
+const topoData = {
+  peaks: experiments.map((e) => ({
+    x: e.mapPosition.x,
+    y: e.mapPosition.y,
+    falloff: 110,
+    strength: 0.45,
+  })),
+  segments: connections.map(([aId, bId]) => {
+    const a = experiments.find((e) => e.id === aId)!;
+    const b = experiments.find((e) => e.id === bId)!;
+    return {
+      a: { x: a.mapPosition.x, y: a.mapPosition.y },
+      b: { x: b.mapPosition.x, y: b.mapPosition.y },
+      falloff: 35,
+      strength: 0.35,
+    };
+  }),
+};
 ---
 
 <Base title="lab — made by sam">
-  <section class="lab" data-mode="map">
-    <header class="lab-header">
-      <div class="lab-intro">
-        <h1>Lab</h1>
-        <p class="lede">A place to play. Experiments from the Obsidian vault, in public.</p>
-      </div>
-      <div class="mode-toggle" role="tablist" aria-label="Lab view mode">
-        <button data-mode="map" class="mode-btn is-active" aria-selected="true">Map</button>
-        <button data-mode="list" class="mode-btn" aria-selected="false">List</button>
-      </div>
-    </header>
-
-    {experiments.length === 0 ? (
-      <p class="empty">Nothing here yet — come back soon.</p>
-    ) : (
-      <>
-        {/* MAP VIEW — landmarks scattered over the topo. Sits fixed over
-            the viewport so the topo background reads as the terrain. */}
-        <div class="lab-map">
-          {experiments.map((exp) => {
-            const isLive = exp.status === 'live';
-            const href = exp.href ?? (exp.slug ? `/lab/${exp.slug}` : undefined);
-            const x = (exp.mapPosition?.x ?? 0.5) * 100;
-            const y = (exp.mapPosition?.y ?? 0.5) * 100;
-            const classes = `map-node map-node--${exp.status} map-node--${exp.category}`;
-            const style = `left: ${x}%; top: ${y}%;`;
-            return (
-              <>
-                {isLive && href ? (
-                  <a href={href} class={classes} style={style}>
-                    <span class="map-node__dot" aria-hidden="true"></span>
-                    <span class="map-node__label">{exp.title}</span>
-                    <span class="map-node__meta">
-                      <span class="map-node__cat">{categoryLabels[exp.category]}</span>
-                    </span>
-                    {exp.note && <span class="map-node__note">{exp.note}</span>}
-                  </a>
-                ) : (
-                  <div class={classes} style={style} aria-disabled="true" tabindex="0">
-                    <span class="map-node__dot" aria-hidden="true"></span>
-                    <span class="map-node__label">{exp.title}</span>
-                    <span class="map-node__meta">
-                      <span class="map-node__cat">{categoryLabels[exp.category]}</span>
-                      <span class="map-node__status">{exp.status}</span>
-                    </span>
-                    {exp.note && <span class="map-node__note">{exp.note}</span>}
-                  </div>
-                )}
-              </>
-            );
-          })}
-        </div>
-
-        {/* LIST VIEW — fallback / reduced-motion / mobile default */}
-        <ul class="lab-list">
-          {experiments.map((exp) => {
-            const isLive = exp.status === 'live';
-            const href = exp.href ?? (exp.slug ? `/lab/${exp.slug}` : undefined);
-            return (
-              <li>
-                {isLive && href ? (
-                  <a href={href} class={`list-card list-card--${exp.status}`}>
-                    <h3>{exp.title}</h3>
-                    <div class="list-card__meta">
-                      <span>{categoryLabels[exp.category]}</span>
-                    </div>
-                    {exp.note && <p>{exp.note}</p>}
-                  </a>
-                ) : (
-                  <div class={`list-card list-card--${exp.status}`} aria-disabled="true">
-                    <h3>{exp.title}</h3>
-                    <div class="list-card__meta">
-                      <span>{categoryLabels[exp.category]}</span>
-                      <span class="list-card__status">{exp.status}</span>
-                    </div>
-                    {exp.note && <p>{exp.note}</p>}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      </>
-    )}
+  <section class="lab-intro">
+    <h1>Lab</h1>
+    <p>A place to play. Experiments from the Obsidian vault, in public.</p>
   </section>
+
+  <div class="lab-map" aria-label="Experiments map">
+    {experiments.map((exp) => {
+      const isLive = exp.status === 'live';
+      const href = exp.href ?? (exp.slug ? `/lab/${exp.slug}` : undefined);
+      const style = `left: ${exp.mapPosition.x * 100}%; top: ${exp.mapPosition.y * 100}%;`;
+      const inner = (
+        <>
+          <span class="node__dot" aria-hidden="true" />
+          <div class="node__label">
+            <span class="node__title">{exp.title}</span>
+            <span class="node__meta">
+              <span>{categoryLabels[exp.category]}</span>
+              {!isLive && <span class="node__status">{exp.status}</span>}
+            </span>
+            {exp.note && <span class="node__note">{exp.note}</span>}
+          </div>
+        </>
+      );
+      return isLive && href ? (
+        <a class={`node node--${exp.status}`} style={style} href={href}>{inner}</a>
+      ) : (
+        <div class={`node node--${exp.status}`} style={style} aria-disabled="true">{inner}</div>
+      );
+    })}
+  </div>
 </Base>
 
+<script define:vars={{ topoData }}>
+  function applyNetworkMode() {
+    const path = window.location.pathname.replace(/\/+$/, '') || '/';
+    if (path !== '/lab') return;
+    if (!window.__topo) return;
+    window.__topo.setMode('locked', {
+      peaks: topoData.peaks,
+      segments: topoData.segments,
+      noiseScale: 0.35,
+      peakAA: 0,
+      strength: 1,
+    });
+  }
+  document.addEventListener('astro:page-load', applyNetworkMode);
+  applyNetworkMode();
+</script>
+
 <style>
-  .lab {
-    position: relative;
-    max-width: 56rem;
-    margin: 0 auto;
-    padding: calc(var(--space-8) * 1.5) var(--space-4) var(--space-8);
+  .lab-intro {
+    position: fixed;
+    top: var(--space-8);
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    z-index: 2;
+    pointer-events: none;
   }
-  .lab-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: var(--space-3);
-    margin-bottom: var(--space-5);
-    flex-wrap: wrap;
-  }
-  h1 {
+  .lab-intro h1 {
     font-size: clamp(2rem, 5vw, 3rem);
     margin-bottom: var(--space-1);
   }
-  .lede {
+  .lab-intro p {
     color: var(--color-fg);
-    opacity: 0.75;
-    max-width: 36rem;
-  }
-  .empty {
-    font-family: var(--font-mono);
-    color: var(--color-fg);
-    opacity: 0.6;
-    padding: var(--space-4) 0;
+    opacity: 0.7;
+    font-size: 0.95rem;
   }
 
-  /* ===== Mode toggle ===== */
-  .mode-toggle {
-    display: inline-flex;
-    gap: 2px;
-    padding: 3px;
-    border: 1px solid color-mix(in oklab, var(--color-fg) 15%, transparent);
-    border-radius: 999px;
-    background: color-mix(in oklab, var(--color-bg) 70%, transparent);
-    backdrop-filter: blur(6px);
-  }
-  .mode-btn {
-    border: 0;
-    background: transparent;
-    color: color-mix(in oklab, var(--color-fg) 60%, transparent);
-    padding: 6px 14px;
-    border-radius: 999px;
-    font-size: 0.85rem;
-    font-family: inherit;
-    cursor: pointer;
-    transition: color var(--transition), background var(--transition);
-  }
-  .mode-btn:hover { color: var(--color-fg); }
-  .mode-btn.is-active {
-    background: color-mix(in oklab, var(--color-fg) 12%, transparent);
-    color: var(--color-fg);
-  }
-
-  /* ===== Mode-driven visibility ===== */
-  .lab[data-mode='map'] .lab-list { display: none; }
-  .lab[data-mode='list'] .lab-map { display: none; }
-
-  /* ===== MAP VIEW ===== */
   .lab-map {
     position: fixed;
     inset: 0;
-    pointer-events: none; /* topo + scroll pass through; nodes opt back in */
-    z-index: 2;
+    z-index: 1;
+    pointer-events: none;
   }
-  .map-node {
+
+  .node {
     position: absolute;
-    /* Centred horizontally on the landmark X; vertically the DOT centre
-       sits on the landmark Y (so it lands inside the topo ring nest).
-       The label + meta flow naturally below. -4px = half the dot height. */
-    transform: translate(-50%, -4px);
-    pointer-events: auto;
-    color: var(--color-fg);
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    color: inherit;
     text-decoration: none;
+    pointer-events: auto;
+    cursor: pointer;
+    /* Light entrance — peaks rise out of the shader morph, labels fade in */
+    opacity: 0;
+    animation: node-in 0.6s ease-out forwards;
+    animation-delay: 0.8s;
+  }
+  .node[aria-disabled='true'] {
+    cursor: default;
+    opacity: 0;
+    animation: node-in-dim 0.6s ease-out forwards;
+    animation-delay: 0.8s;
+  }
+
+  @keyframes node-in {
+    from { opacity: 0; transform: translate(-50%, -45%); }
+    to   { opacity: 1; transform: translate(-50%, -50%); }
+  }
+  @keyframes node-in-dim {
+    from { opacity: 0; transform: translate(-50%, -45%); }
+    to   { opacity: 0.6; transform: translate(-50%, -50%); }
+  }
+
+  .node__dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--color-fg);
+    box-shadow: 0 0 0 4px var(--color-bg), 0 0 14px var(--color-bg);
+    transition: transform var(--transition), background var(--transition);
+  }
+  .node:hover .node__dot {
+    transform: scale(1.4);
+    background: var(--color-accent);
+  }
+  .node[aria-disabled='true']:hover .node__dot {
+    transform: none;
+    background: var(--color-fg);
+  }
+
+  .node__label {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    max-width: 14rem;
     text-align: center;
+    max-width: 14rem;
     text-shadow:
       0 0 8px var(--color-bg),
-      0 0 20px var(--color-bg);
-    /* Fade in after the topo morph has had a beat to settle. Staggered by
-       nth-child below so landmarks appear one after another, not all at
-       once — feels like the map "boots up". */
-    opacity: 0;
-    animation: map-node-in 0.6s ease-out forwards;
+      0 0 16px var(--color-bg),
+      0 0 24px var(--color-bg);
   }
-  @keyframes map-node-in {
-    from { opacity: 0; transform: translate(-50%, -4px) scale(0.94); }
-    to   { opacity: 1; transform: translate(-50%, -4px) scale(1); }
-  }
-  /* Delay timeline: topo needs ~1.6s to morph + settle visibly before
-     landmarks should appear. Each subsequent landmark is staggered 220ms
-     so the cascade feels deliberate, not all-at-once. */
-  .map-node:nth-child(1) { animation-delay: 1.6s; }
-  .map-node:nth-child(2) { animation-delay: 1.82s; }
-  .map-node:nth-child(3) { animation-delay: 2.04s; }
-  .map-node:nth-child(4) { animation-delay: 2.26s; }
-  .map-node:nth-child(5) { animation-delay: 2.48s; }
-  .map-node:nth-child(6) { animation-delay: 2.7s; }
-  .map-node:nth-child(7) { animation-delay: 2.92s; }
-  .map-node:nth-child(8) { animation-delay: 3.14s; }
-
-  @media (prefers-reduced-motion: reduce) {
-    .map-node { animation: none; opacity: 1; }
-  }
-  /* Marker reads as a map feature, not a UI dot — smaller, with stroke
-     width that matches the topo line so it feels part of the same drawing.
-     Live landmarks are filled (more emphasis, clickable); sketching are
-     just outlined rings (looks like a contour intersection on the map). */
-  .map-node__dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--color-fg);
-    box-sizing: border-box;
-    transition:
-      transform var(--transition),
-      box-shadow var(--transition),
-      background var(--transition),
-      border-color var(--transition);
-  }
-  .map-node:hover .map-node__dot,
-  .map-node:focus-visible .map-node__dot {
-    transform: scale(1.5);
-    box-shadow: 0 0 0 6px color-mix(in oklab, var(--color-accent) 20%, transparent);
-  }
-  .map-node__label {
+  .node__title {
+    font-size: 1.05rem;
     font-weight: 500;
-    font-size: 1rem;
-    letter-spacing: -0.02em;
-    line-height: 1.2;
     transition: color var(--transition);
   }
-  .map-node__meta {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-  .map-node__cat { opacity: 0.55; }
-  .map-node__status {
-    color: var(--color-accent);
-    opacity: 0.85;
-  }
-  .map-node__note {
-    margin-top: 6px;
-    font-size: 0.82rem;
-    line-height: 1.4;
-    color: color-mix(in oklab, var(--color-fg) 70%, transparent);
-    opacity: 0;
-    max-height: 0;
-    overflow: hidden;
-    transition: opacity var(--transition), max-height var(--transition);
-  }
-  .map-node:hover .map-node__note,
-  .map-node:focus-visible .map-node__note {
-    opacity: 1;
-    max-height: 7em;
-  }
+  .node:hover .node__title { color: var(--color-accent); }
+  .node[aria-disabled='true']:hover .node__title { color: inherit; }
 
-  /* Live nodes — pop on hover */
-  .map-node--live:hover .map-node__label,
-  .map-node--live:focus-visible .map-node__label {
-    color: var(--color-accent);
-  }
-
-  /* Sketching / parked — outlined ring (no fill), reads like an "X marks
-     where this will be" annotation rather than a dashed placeholder. */
-  .map-node--sketching,
-  .map-node--parked {
-    cursor: default;
-  }
-  .map-node--sketching .map-node__dot,
-  .map-node--parked .map-node__dot {
-    background: transparent;
-    border: 1.5px solid color-mix(in oklab, var(--color-fg) 65%, transparent);
-  }
-  .map-node--parked .map-node__dot {
-    border-style: dashed;
-  }
-  .map-node--sketching .map-node__label,
-  .map-node--parked .map-node__label {
-    color: color-mix(in oklab, var(--color-fg) 65%, transparent);
-  }
-
-  /* ===== LIST VIEW ===== */
-  .lab-list {
-    list-style: none;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
-    gap: var(--space-2);
-    padding: 0;
-    margin: 0;
-  }
-  .list-card {
-    display: block;
-    padding: var(--space-3);
-    border: 1px solid color-mix(in oklab, var(--color-fg) 15%, transparent);
-    border-radius: var(--radius);
-    transition: border-color var(--transition), color var(--transition);
-    color: inherit;
-  }
-  .list-card[aria-disabled='true'] {
-    opacity: 0.6;
-    cursor: default;
-  }
-  .list-card:hover {
-    border-color: var(--color-accent);
-  }
-  .list-card[aria-disabled='true']:hover {
-    border-color: color-mix(in oklab, var(--color-fg) 15%, transparent);
-  }
-  .list-card:hover h3 {
-    color: var(--color-accent);
-  }
-  .list-card[aria-disabled='true']:hover h3 {
-    color: inherit;
-  }
-  .list-card h3 {
-    font-size: 1.05rem;
-    margin-bottom: var(--space-1);
-  }
-  .list-card__meta {
+  .node__meta {
     display: flex;
     gap: 8px;
     font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    opacity: 0.6;
-    margin-bottom: var(--space-1);
+    opacity: 0.7;
   }
-  .list-card__status {
-    color: var(--color-accent);
-    opacity: 0.9;
-  }
-  .list-card p {
-    font-size: 0.9rem;
+  .node__status { color: var(--color-accent); opacity: 0.9; }
+
+  .node__note {
+    font-size: 0.8rem;
     color: var(--color-fg);
-    opacity: 0.75;
-    margin: 0;
+    opacity: 0.7;
+    max-width: 12rem;
+    line-height: 1.4;
   }
 
-  /* ===== Narrow screens ===== */
   @media (max-width: 720px) {
-    .lab-header {
-      flex-direction: column-reverse;
-      align-items: flex-start;
-    }
+    .lab-intro { top: calc(var(--space-8) - 1rem); }
+    .node__label { max-width: 9rem; }
+    .node__title { font-size: 0.95rem; }
+    .node__note { font-size: 0.75rem; max-width: 9rem; }
   }
 </style>
-
-<script define:vars={{ topoPeaks, topoStrength }}>
-  // ----- Map / List mode toggle -----
-  // Default chosen by environment (reduced-motion + coarse-pointer fall back
-  // to list). Explicit user choice persists via localStorage.
-  function initLab() {
-    const section = document.querySelector('.lab');
-    if (!section) return;
-    const toggle = section.querySelector('.mode-toggle');
-    const btns = section.querySelectorAll('.mode-btn');
-
-    function getInitialMode() {
-      try {
-        const stored = localStorage.getItem('lab-mode');
-        if (stored === 'map' || stored === 'list') return stored;
-      } catch {}
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return 'list';
-      if (window.matchMedia('(pointer: coarse)').matches) return 'list';
-      return 'map';
-    }
-
-    function applyMode(mode) {
-      section.setAttribute('data-mode', mode);
-      btns.forEach((b) => {
-        const isActive = b.getAttribute('data-mode') === mode;
-        b.classList.toggle('is-active', isActive);
-        b.setAttribute('aria-selected', isActive ? 'true' : 'false');
-      });
-      // When listing, return the topo to mouse-follow so it doesn't look
-      // mysteriously frozen behind the cards. When mapping, lock peaks
-      // under the landmarks.
-      syncTopoToMode(mode);
-    }
-
-    applyMode(getInitialMode());
-
-    toggle?.addEventListener('click', (e) => {
-      const btn = e.target?.closest('.mode-btn');
-      if (!btn) return;
-      const mode = btn.getAttribute('data-mode');
-      if (mode !== 'map' && mode !== 'list') return;
-      applyMode(mode);
-      try { localStorage.setItem('lab-mode', mode); } catch {}
-    });
-  }
-
-  // ----- Topo binding -----
-  // When the lab is in map mode, ask the topo shader to lock its peaks at
-  // each landmark's normalised viewport coords. When leaving the lab page
-  // (or switching to list), restore mouse-follow.
-  function syncTopoToMode(mode) {
-    if (!window.__topo) return;
-    if (mode === 'map') {
-      window.__topo.setMode('locked', topoPeaks, { strength: topoStrength });
-    } else {
-      window.__topo.setMode('follow');
-    }
-  }
-
-  function onPageLoad() {
-    // Only initLab when we're actually on the /lab page (handler is global,
-    // fires on every ClientRouter swap)
-    if (location.pathname.startsWith('/lab')) {
-      initLab();
-    } else {
-      // Leaving lab — restore mouse-follow regardless of what the lab page
-      // had it set to.
-      window.__topo?.setMode('follow');
-    }
-  }
-
-  // Register once, idempotent across navigations
-  if (!window.__labPageListener) {
-    window.__labPageListener = true;
-    document.addEventListener('astro:page-load', onPageLoad);
-  }
-  onPageLoad();
-</script>

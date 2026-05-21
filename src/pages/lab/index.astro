@@ -75,15 +75,18 @@ const categoryLabels: Record<Category, string> = {
 //   landmark: narrow but with enough strength to form their own visible
 //             rings against the central peak's slope (falloff 22,
 //             strength 0.6)
+// Flatter terrain so the landmarks ARE the features. Central peak is a
+// gentle rise toward the centre (low strength + wide falloff); landmarks
+// stand on top of it as clearer little hills.
 const topoPeaks = [
-  { x: 0.5, y: 0.5, falloff: 3.5, strength: 1.0 },
+  { x: 0.5, y: 0.5, falloff: 3.5, strength: 0.4 },
   ...experiments
     .filter((e) => e.mapPosition)
     .map((e) => ({
       x: e.mapPosition!.x,
       y: e.mapPosition!.y,
       falloff: 22,
-      strength: 0.55,
+      strength: 0.6,
     })),
 ];
 const topoStrength = 1.0;
@@ -286,11 +289,16 @@ const topoStrength = 1.0;
   @media (prefers-reduced-motion: reduce) {
     .map-node { animation: none; opacity: 1; }
   }
+  /* Marker reads as a map feature, not a UI dot — smaller, with stroke
+     width that matches the topo line so it feels part of the same drawing.
+     Live landmarks are filled (more emphasis, clickable); sketching are
+     just outlined rings (looks like a contour intersection on the map). */
   .map-node__dot {
-    width: 12px;
-    height: 12px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: var(--color-fg);
+    box-sizing: border-box;
     transition:
       transform var(--transition),
       box-shadow var(--transition),
@@ -299,8 +307,8 @@ const topoStrength = 1.0;
   }
   .map-node:hover .map-node__dot,
   .map-node:focus-visible .map-node__dot {
-    transform: scale(1.35);
-    box-shadow: 0 0 0 8px color-mix(in oklab, var(--color-accent) 25%, transparent);
+    transform: scale(1.5);
+    box-shadow: 0 0 0 6px color-mix(in oklab, var(--color-accent) 20%, transparent);
   }
   .map-node__label {
     font-weight: 500;
@@ -344,7 +352,8 @@ const topoStrength = 1.0;
     color: var(--color-accent);
   }
 
-  /* Sketching / parked — dim, dashed, no pointer */
+  /* Sketching / parked — outlined ring (no fill), reads like an "X marks
+     where this will be" annotation rather than a dashed placeholder. */
   .map-node--sketching,
   .map-node--parked {
     cursor: default;
@@ -352,14 +361,14 @@ const topoStrength = 1.0;
   .map-node--sketching .map-node__dot,
   .map-node--parked .map-node__dot {
     background: transparent;
-    border: 1.5px dashed color-mix(in oklab, var(--color-fg) 45%, transparent);
+    border: 1.5px solid color-mix(in oklab, var(--color-fg) 65%, transparent);
+  }
+  .map-node--parked .map-node__dot {
+    border-style: dashed;
   }
   .map-node--sketching .map-node__label,
   .map-node--parked .map-node__label {
     color: color-mix(in oklab, var(--color-fg) 65%, transparent);
-  }
-  .map-node--parked .map-node__dot {
-    border-style: dotted;
   }
 
   /* ===== LIST VIEW ===== */

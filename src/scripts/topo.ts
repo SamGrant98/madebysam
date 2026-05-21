@@ -70,12 +70,14 @@ const fragment = /* glsl */ `
     vec2 res = uResolution;
     vec2 uv = (gl_FragCoord.xy - 0.5 * res) / min(res.x, res.y);
 
-    // Gentler base noise — peaks shape the rings, noise only perturbs.
-    float h = 0.55 * fbm(uv * 1.5);
+    // Very gentle base noise — the terrain reads as mostly flat, with the
+    // landmark + central peaks providing all the meaningful elevation.
+    // Less noise = the landmark hills clearly own their territory rather
+    // than fighting random ridges.
+    float h = 0.3 * fbm(uv * 1.5);
 
     // Tiny static wiggle so the rings have a hand-drawn quality instead
-    // of perfect mathematical curves. Subtle enough that the cartography
-    // reads as intentional, not chaotic.
+    // of perfect mathematical curves.
     h += 0.003 * (noise(uv * 11.0) - 0.0);
 
     // Accumulate elevation from each active peak.

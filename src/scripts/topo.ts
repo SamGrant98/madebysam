@@ -109,8 +109,10 @@ type NormPos = { x: number; y: number };
 
 // Exposed controller. /lab calls setMode('locked') with peak positions; other
 // pages can call setMode('follow') to return to the cursor-tracking behaviour.
+// The `strength` option scales how dominant the peaks are — bump it for a
+// single central "mountain" to feel taller; leave at 1 for natural follow.
 export interface TopoController {
-  setMode(mode: Mode, peaks?: NormPos[]): void;
+  setMode(mode: Mode, peaks?: NormPos[], opts?: { strength?: number }): void;
   setPeaks(peaks: NormPos[]): void;
 }
 
@@ -184,7 +186,7 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
     ];
   }
 
-  function setMode(next: Mode, newPeaks?: NormPos[]) {
+  function setMode(next: Mode, newPeaks?: NormPos[], opts?: { strength?: number }) {
     mode = next;
     if (next === 'locked') {
       if (newPeaks) lockedPositions = newPeaks.slice();
@@ -203,6 +205,9 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
       peaks.length = 0;
       peaks.push({ target: [...mouseTarget], current: spawn });
     }
+    // Strength: caller-supplied for locked mode, default 1 for follow.
+    program.uniforms.uPeakStrength.value =
+      opts?.strength ?? (next === 'locked' ? 1.0 : 1.0);
   }
 
   function setPeaks(newPeaks: NormPos[]) {

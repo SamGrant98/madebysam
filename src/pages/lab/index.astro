@@ -68,12 +68,11 @@ const categoryLabels: Record<Category, string> = {
   'tools': 'Tools',
 };
 
-// Peak positions handed to the topo shader so each landmark sits on its own
-// hill, making the contour lines read as a real map. Only entries with an
-// explicit mapPosition contribute.
-const topoPeaks = experiments
-  .filter((e) => e.mapPosition)
-  .map((e) => ({ x: e.mapPosition!.x, y: e.mapPosition!.y }));
+// One central peak — landmarks sit on the rings that emanate outward from
+// it like terrain features around a mountain. Stronger than the default
+// mouse-follow peak so the topology reads as a definite landform.
+const topoPeaks = [{ x: 0.5, y: 0.5 }];
+const topoStrength = 1.6;
 ---
 
 <Base title="lab — made by sam">
@@ -248,6 +247,28 @@ const topoPeaks = experiments
     text-shadow:
       0 0 8px var(--color-bg),
       0 0 20px var(--color-bg);
+    /* Fade in after the topo morph has had a beat to settle. Staggered by
+       nth-child below so landmarks appear one after another, not all at
+       once — feels like the map "boots up". */
+    opacity: 0;
+    animation: map-node-in 0.6s ease-out forwards;
+  }
+  @keyframes map-node-in {
+    from { opacity: 0; transform: translate(-50%, -50%) scale(0.94); }
+    to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+  /* Delay timeline: topo settle ~1.0s then landmarks cascade in over ~600ms */
+  .map-node:nth-child(1) { animation-delay: 1.0s; }
+  .map-node:nth-child(2) { animation-delay: 1.18s; }
+  .map-node:nth-child(3) { animation-delay: 1.36s; }
+  .map-node:nth-child(4) { animation-delay: 1.54s; }
+  .map-node:nth-child(5) { animation-delay: 1.72s; }
+  .map-node:nth-child(6) { animation-delay: 1.9s; }
+  .map-node:nth-child(7) { animation-delay: 2.08s; }
+  .map-node:nth-child(8) { animation-delay: 2.26s; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .map-node { animation: none; opacity: 1; }
   }
   .map-node__dot {
     width: 12px;
@@ -391,7 +412,7 @@ const topoPeaks = experiments
   }
 </style>
 
-<script define:vars={{ topoPeaks }}>
+<script define:vars={{ topoPeaks, topoStrength }}>
   // ----- Map / List mode toggle -----
   // Default chosen by environment (reduced-motion + coarse-pointer fall back
   // to list). Explicit user choice persists via localStorage.
@@ -443,7 +464,7 @@ const topoPeaks = experiments
   function syncTopoToMode(mode) {
     if (!window.__topo) return;
     if (mode === 'map') {
-      window.__topo.setMode('locked', topoPeaks);
+      window.__topo.setMode('locked', topoPeaks, { strength: topoStrength });
     } else {
       window.__topo.setMode('follow');
     }

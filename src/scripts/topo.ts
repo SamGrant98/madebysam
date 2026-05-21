@@ -95,26 +95,39 @@ const fragment = /* glsl */ `
     float isMajor = step(mod(bandNum, 5.0), 0.5);
     float topoContour = mix(minorLine * 0.8, majorLine, isMajor);
 
-    // ---- Grid: pixel-perfect cartesian, major every 5th ----
+    // ---- Grid with fbm distortion ----
+    // The grid's input coords are shoved around by an fbm offset whose
+    // magnitude FADES with morph: heavy mid-morph (grid lines look like
+    // organic curves), zero at morph=1 (lines are straight). Combined with
+    // the topo fade-out, the eye reads it as the topo lines physically
+    // straightening into the grid rather than a crossfade between two
+    // fixed visuals.
+    float distortFactor = pow(1.0 - uMorph, 0.55);
+    vec2 distortUv = uv * 2.2;
+    vec2 distortAmt = vec2(
+      fbm(distortUv),
+      fbm(distortUv + vec2(7.13, 3.41))
+    ) * 80.0 * distortFactor;
+    vec2 fragD = gl_FragCoord.xy + distortAmt;
+
     float gridSpacing = 80.0;
-    vec2 gPx = mod(gl_FragCoord.xy, gridSpacing);
+    vec2 gPx = mod(fragD, gridSpacing);
     vec2 gNear = min(gPx, gridSpacing - gPx);
-    float gDist = min(gNear.x, gNear.y);
-    float gridMinor = 1.0 - smoothstep(0.0, 1.0, gDist);
+    float gridMinor = 1.0 - smoothstep(0.0, 1.0, min(gNear.x, gNear.y));
 
     float majorSpacing = gridSpacing * 5.0;
-    vec2 gPxM = mod(gl_FragCoord.xy, majorSpacing);
+    vec2 gPxM = mod(fragD, majorSpacing);
     vec2 gNearM = min(gPxM, majorSpacing - gPxM);
-    float gDistM = min(gNearM.x, gNearM.y);
-    float gridMajor = 1.0 - smoothstep(0.0, 1.5, gDistM);
+    float gridMajor = 1.0 - smoothstep(0.0, 1.5, min(gNearM.x, gNearM.y));
 
     float gridFull = max(gridMinor * 0.32, gridMajor * 0.55);
 
-    // ---- Crossfade ----
-    // topo fades out across 0..0.7, grid fades in across 0.3..1.0 —
-    // overlap window 0.3..0.7 keeps the screen from going blank in the middle.
-    float topoFade = 1.0 - smoothstep(0.0, 0.7, uMorph);
-    float gridFade = smoothstep(0.3, 1.0, uMorph);
+    // ---- Blend ----
+    // Topo fades out earlier; grid begins emerging (with heavy wobble) just
+    // after morph leaves 0, so the transition feels like one continuous
+    // line-flow rather than two layers crossfading.
+    float topoFade = 1.0 - smoothstep(0.0, 0.55, uMorph);
+    float gridFade = smoothstep(0.1, 1.0, uMorph);
     float line = topoContour * topoFade + gridFull * gridFade;
 
     vec3 col = mix(uBg, uLine, line);

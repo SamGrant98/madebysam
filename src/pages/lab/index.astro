@@ -1,9 +1,10 @@
 ---
 import Base from '../../layouts/Base.astro';
 
-// Each experiment is a node on the map. mapPosition.{x,y} are normalised
-// viewport coords (0..1, y measured from the TOP). Edit freely; the shader
-// will follow.
+// Lab nodes. mapPosition.{x,y} are normalised viewport coords (0..1, y from
+// the TOP). Connections define the edges the shader will draw as part of
+// the topo→network morph.
+
 type Category = 'three-d' | 'generative' | 'data' | 'audio' | 'tools';
 type Status = 'live' | 'sketching' | 'parked';
 
@@ -26,7 +27,7 @@ const experiments: Experiment[] = [
     category: 'three-d',
     status: 'live',
     note: 'A 3D shelf for your physical media. Drop in a CSV, browse in space.',
-    mapPosition: { x: 0.75, y: 0.34 },
+    mapPosition: { x: 0.74, y: 0.36 },
   },
   {
     id: 'topo-playground',
@@ -42,7 +43,7 @@ const experiments: Experiment[] = [
     category: 'tools',
     status: 'sketching',
     note: 'Throw a photo at it, get a colour system out.',
-    mapPosition: { x: 0.78, y: 0.72 },
+    mapPosition: { x: 0.78, y: 0.7 },
   },
   {
     id: 'audio-reactive',
@@ -50,11 +51,10 @@ const experiments: Experiment[] = [
     category: 'audio',
     status: 'sketching',
     note: 'Mic input drives a shader — volume, frequency, beat.',
-    mapPosition: { x: 0.4, y: 0.8 },
+    mapPosition: { x: 0.36, y: 0.78 },
   },
 ];
 
-// Edges of the network. Each pair is a path drawn between the two nodes.
 const connections: [string, string][] = [
   ['dvd-shelf', 'topo-playground'],
   ['dvd-shelf', 'palette-generator'],
@@ -71,13 +71,15 @@ const categoryLabels: Record<Category, string> = {
   'tools': 'Tools',
 };
 
-// Serialise data for the in-page script
+// Serialise topo network config for the in-page script.
+//   peak  falloff 120 → tight ring nest under each dot
+//   seg   falloff 28  → ridges wide enough to see mid-morph collapse to centreline
 const topoData = {
   peaks: experiments.map((e) => ({
     x: e.mapPosition.x,
     y: e.mapPosition.y,
-    falloff: 110,
-    strength: 0.45,
+    falloff: 120,
+    strength: 0.32,
   })),
   segments: connections.map(([aId, bId]) => {
     const a = experiments.find((e) => e.id === aId)!;
@@ -85,8 +87,8 @@ const topoData = {
     return {
       a: { x: a.mapPosition.x, y: a.mapPosition.y },
       b: { x: b.mapPosition.x, y: b.mapPosition.y },
-      falloff: 35,
-      strength: 0.35,
+      falloff: 28,
+      strength: 0.7,
     };
   }),
 };
@@ -99,10 +101,10 @@ const topoData = {
   </section>
 
   <div class="lab-map" aria-label="Experiments map">
-    {experiments.map((exp) => {
+    {experiments.map((exp, idx) => {
       const isLive = exp.status === 'live';
       const href = exp.href ?? (exp.slug ? `/lab/${exp.slug}` : undefined);
-      const style = `left: ${exp.mapPosition.x * 100}%; top: ${exp.mapPosition.y * 100}%;`;
+      const style = `left: ${exp.mapPosition.x * 100}%; top: ${exp.mapPosition.y * 100}%; --node-i: ${idx};`;
       const inner = (
         <>
           <span class="node__dot" aria-hidden="true" />
@@ -126,20 +128,15 @@ const topoData = {
 </Base>
 
 <script define:vars={{ topoData }}>
-  function applyNetworkMode() {
+  function applyMorph() {
     const path = window.location.pathname.replace(/\/+$/, '') || '/';
     if (path !== '/lab') return;
     if (!window.__topo) return;
-    window.__topo.setMode('locked', {
-      peaks: topoData.peaks,
-      segments: topoData.segments,
-      noiseScale: 0.35,
-      peakAA: 0,
-      strength: 1,
-    });
+    window.__topo.setMorphTargets(topoData);
+    window.__topo.setMorph(1, 1200);
   }
-  document.addEventListener('astro:page-load', applyNetworkMode);
-  applyNetworkMode();
+  document.addEventListener('astro:page-load', applyMorph);
+  applyMorph();
 </script>
 
 <style>
@@ -149,8 +146,16 @@ const topoData = {
     left: 50%;
     transform: translateX(-50%);
     text-align: center;
-    z-index: 2;
+    z-index: 3;
     pointer-events: none;
+    /* Fade with the morph — title appears as the network resolves */
+    opacity: 0;
+    animation: lab-intro-in 0.7s ease-out forwards;
+    animation-delay: 0.55s;
+  }
+  @keyframes lab-intro-in {
+    from { opacity: 0; transform: translate(-50%, -8px); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
   }
   .lab-intro h1 {
     font-size: clamp(2rem, 5vw, 3rem);
@@ -165,7 +170,7 @@ const topoData = {
   .lab-map {
     position: fixed;
     inset: 0;
-    z-index: 1;
+    z-index: 2;
     pointer-events: none;
   }
 
@@ -180,18 +185,17 @@ const topoData = {
     text-decoration: none;
     pointer-events: auto;
     cursor: pointer;
-    /* Light entrance — peaks rise out of the shader morph, labels fade in */
     opacity: 0;
-    animation: node-in 0.6s ease-out forwards;
-    animation-delay: 0.8s;
+    /* Nodes land AFTER the shader morph has drawn the connecting lines.
+       Stagger keeps the arrival feeling organic — the network "wires up",
+       then the landmarks settle one by one. */
+    animation: node-in 0.55s ease-out forwards;
+    animation-delay: calc(0.85s + var(--node-i) * 0.08s);
   }
   .node[aria-disabled='true'] {
     cursor: default;
-    opacity: 0;
-    animation: node-in-dim 0.6s ease-out forwards;
-    animation-delay: 0.8s;
+    animation-name: node-in-dim;
   }
-
   @keyframes node-in {
     from { opacity: 0; transform: translate(-50%, -45%); }
     to   { opacity: 1; transform: translate(-50%, -50%); }
@@ -202,11 +206,14 @@ const topoData = {
   }
 
   .node__dot {
-    width: 12px;
-    height: 12px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
     background: var(--color-fg);
-    box-shadow: 0 0 0 4px var(--color-bg), 0 0 14px var(--color-bg);
+    /* Halo so the dot stays distinct from the shader-drawn ring nest */
+    box-shadow:
+      0 0 0 5px var(--color-bg),
+      0 0 18px var(--color-bg);
     transition: transform var(--transition), background var(--transition);
   }
   .node:hover .node__dot {

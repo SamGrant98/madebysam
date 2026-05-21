@@ -29,14 +29,25 @@
     initTopoCanvas(canvas);
   }
 
-  // Per-page topo mode sync. /lab sets its own network mode via its own
-  // page-load listener; every other page falls back to mouse-follow so we
-  // don't carry the network into home/about when navigating back.
-  function syncTopoMode() {
-    const path = window.location.pathname.replace(/\/+$/, '') || '/';
-    if (path === '/lab') return;
-    window.__topo?.setMode('follow');
+  // Exit-morph for /lab: when navigating AWAY, kick the topo back to 0
+  // before the swap so the network dissolves back into the contour map.
+  // We also briefly delay the loader so the morph has time to play.
+  function cleanPath(u: URL | undefined | null): string {
+    if (!u) return '/';
+    return (u.pathname ?? '').replace(/\/+$/, '') || '/';
   }
-  document.addEventListener('astro:page-load', syncTopoMode);
-  syncTopoMode();
+  document.addEventListener('astro:before-preparation', (e: any) => {
+    const from = cleanPath(e?.from);
+    const to = cleanPath(e?.to);
+    if (from === '/lab' && to !== '/lab') {
+      window.__topo?.setMorph(0, 700);
+      const orig = e.loader;
+      e.loader = async () => {
+        // Hold the swap so most of the exit morph plays while the lab DOM
+        // is still on screen, then let Astro finish loading the next page.
+        await new Promise((r) => setTimeout(r, 500));
+        await orig();
+      };
+    }
+  });
 </script>

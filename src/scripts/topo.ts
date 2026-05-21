@@ -1,15 +1,20 @@
 import { Renderer, Program, Mesh, Triangle } from 'ogl';
 
-// Multi-feature topo shader. Two feature types contribute to the heightfield:
-//   PEAKS    — radial hills (1 / (1 + d² · falloff)) at fixed points.
-//              Contours appear as concentric rings around each peak.
-//   SEGMENTS — ridges along line segments (same kernel, but distance-to-
-//              segment instead of distance-to-point). Contours flow PARALLEL
-//              to the segment, reading as a road on a topographic map.
+// Topo shader with a built-in morph from contour map → node-link network.
+// A single uMorph uniform (0..1) drives the transition; the JS layer animates
+// it and scales per-feature strengths in lockstep:
 //
-// /lab uses both: a peak at each landmark + segments connecting them, so the
-// experiments form a visible network. The home/about pages use a single
-// mouse-tracked peak with full base noise (original behaviour).
+//   uMorph = 0   → home topo:  full noise, mouse-follow peak, no segments,
+//                              no network lines.
+//   uMorph = 0.5 → transition: half noise, segment RIDGES at peak strength
+//                              (contour lines pull along each path), faint
+//                              direct lines starting to appear.
+//   uMorph = 1   → network:    minimal noise, segments fully faded, direct
+//                              thin lines drawn between landmark dots, small
+//                              "landmark" peaks anchor each dot.
+//
+// Because the canvas persists across Astro navigation, animating uMorph back
+// to 0 from outside /lab smoothly dissolves the network back into the topo.
 
 const MAX_PEAKS = 8;
 const MAX_SEGS = 8;
@@ -32,19 +37,15 @@ const fragment = /* glsl */ `
   const int MAX_PEAKS = ${MAX_PEAKS};
   const int MAX_SEGS  = ${MAX_SEGS};
 
-  // Each peak packs: xy = pixel pos, z = falloff, w = strength
-  uniform vec4  uPeaks[MAX_PEAKS];
+  uniform vec4  uPeaks[MAX_PEAKS];      // xy=pos, z=falloff, w=strength (already morph-scaled by JS)
   uniform int   uPeakCount;
-
-  // Segments pack endpoints (ax, ay, bx, by) + (falloff, strength) in a
-  // parallel params array. Splitting to two arrays keeps the vec4 layout.
-  uniform vec4  uSegments[MAX_SEGS];
-  uniform vec2  uSegParams[MAX_SEGS];
+  uniform vec4  uSegments[MAX_SEGS];    // (ax, ay, bx, by) px
+  uniform vec2  uSegParams[MAX_SEGS];   // (falloff, strength — strength morph-scaled by JS)
   uniform int   uSegCount;
 
-  uniform float uPeakStrength;   // global crossfade multiplier
-  uniform float uNoiseScale;     // multiplier on the base fbm noise field
-  uniform float uPeakAA;         // line widening near peaks (0 = uniform AA)
+  uniform float uPeakStrength;    // global multiplier (kept for crossfades)
+  uniform float uPeakAA;          // line-widening near peaks (0 = uniform)
+  uniform float uMorph;           // 0 = topo, 1 = network
 
   vec2 hash2(vec2 p) {
     p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
@@ -87,10 +88,12 @@ const fragment = /* glsl */ `
     vec2 res = uResolution;
     vec2 uv = (gl_FragCoord.xy - 0.5 * res) / min(res.x, res.y);
 
-    float h = uNoiseScale * fbm(uv * 1.5);
+    // Noise field dims as we approach the network state — keeps a faint
+    // texture under the network rather than going to dead black.
+    float noiseScale = mix(1.0, 0.1, uMorph);
+    float h = noiseScale * fbm(uv * 1.5);
     float maxShape = 0.0;
 
-    // Peaks — radial hills
     for (int i = 0; i < MAX_PEAKS; i++) {
       if (i >= uPeakCount) break;
       vec4 pk = uPeaks[i];
@@ -102,7 +105,9 @@ const fragment = /* glsl */ `
       maxShape = max(maxShape, shape * pk.w);
     }
 
-    // Segments — ridges along a line; contours run parallel to the segment
+    // Segments sharpen as morph progresses — wider ridges flanking paths
+    // mid-morph collapse toward the centreline near uMorph = 1.
+    float segFalloffMult = mix(1.0, 4.0, uMorph);
     for (int i = 0; i < MAX_SEGS; i++) {
       if (i >= uSegCount) break;
       vec4 s = uSegments[i];
@@ -110,7 +115,7 @@ const fragment = /* glsl */ `
       vec2 sb = (s.zw - 0.5 * res) / min(res.x, res.y);
       float d = distSegment(uv, sa, sb);
       vec2 sp = uSegParams[i];
-      float falloff = max(0.5, sp.x);
+      float falloff = max(0.5, sp.x) * segFalloffMult;
       float ridge = 1.0 / (1.0 + d * d * falloff);
       h += sp.y * uPeakStrength * ridge;
     }
@@ -119,19 +124,35 @@ const fragment = /* glsl */ `
     float v = fract(h * bands);
     float edge = min(v, 1.0 - v);
 
-    // Peak-widened AA: lines bloom near the cursor in follow mode;
-    // uniform on the lab map (uPeakAA = 0) for a clean cartographic line.
+    // AA glow scales with (1 - uMorph) so the cursor halo fades out as the
+    // map "resolves" into the network.
     float baseAA = bands / min(res.x, res.y) * 1.5;
-    float aa = baseAA * (1.0 + maxShape * uPeakStrength * uPeakAA);
+    float peakAA_active = uPeakAA * (1.0 - uMorph);
+    float aa = baseAA * (1.0 + maxShape * uPeakStrength * peakAA_active);
 
-    // Major rings every 5th — slightly thicker, full opacity. Minor are dim.
     float minorLine = 1.0 - smoothstep(0.0, aa, edge);
     float majorLine = 1.0 - smoothstep(0.0, aa * 1.5, edge);
     float bandNum = floor(h * bands);
     float isMajor = step(mod(bandNum, 5.0), 0.5);
-    float line = mix(minorLine * 0.8, majorLine, isMajor);
+    float contourLine = mix(minorLine * 0.8, majorLine, isMajor);
 
-    vec3 col = mix(uBg, uLine, line);
+    // Direct network lines — render thin straight strokes between every
+    // active segment's endpoints. They fade in during the second half of the
+    // morph so the contour ridges have time to "lead the eye in" first.
+    float networkLine = 0.0;
+    float lineUv = 1.4 / min(res.x, res.y);
+    for (int i = 0; i < MAX_SEGS; i++) {
+      if (i >= uSegCount) break;
+      vec4 s = uSegments[i];
+      vec2 sa = (s.xy - 0.5 * res) / min(res.x, res.y);
+      vec2 sb = (s.zw - 0.5 * res) / min(res.x, res.y);
+      float d = distSegment(uv, sa, sb);
+      networkLine = max(networkLine, smoothstep(lineUv, 0.0, d));
+    }
+    networkLine *= smoothstep(0.5, 1.0, uMorph) * 0.6;
+
+    float totalLine = max(contourLine, networkLine);
+    vec3 col = mix(uBg, uLine, totalLine);
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -146,7 +167,6 @@ function hexToRgb(hex: string): [number, number, number] | null {
   ];
 }
 
-type Mode = 'follow' | 'locked';
 type NormPos = { x: number; y: number; falloff?: number; strength?: number };
 type NormSeg = {
   a: { x: number; y: number };
@@ -155,11 +175,13 @@ type NormSeg = {
   strength?: number;
 };
 
+type PeakRole = 'mouse' | 'landmark';
 type Peak = {
   target: [number, number];
   current: [number, number];
   falloff: number;
-  strength: number;
+  baseStrength: number;
+  role: PeakRole;
 };
 type Seg = {
   aTarget: [number, number];
@@ -167,36 +189,32 @@ type Seg = {
   bTarget: [number, number];
   bCurrent: [number, number];
   falloff: number;
-  strength: number;
+  baseStrength: number;
 };
 
 const DEFAULT_PEAK_FALLOFF = 8.0;
 const DEFAULT_PEAK_STRENGTH = 0.55;
-const DEFAULT_SEG_FALLOFF = 40.0;
-const DEFAULT_SEG_STRENGTH = 0.4;
-
-// Per-mode visual defaults — follow gets the original glow, locked is flat
-// and cartographic.
-const MODE_DEFAULTS: Record<Mode, { noiseScale: number; peakAA: number }> = {
-  follow: { noiseScale: 1.0, peakAA: 4.0 },
-  locked: { noiseScale: 0.5, peakAA: 0.0 },
-};
-
-export interface SetModeOpts {
-  peaks?: NormPos[];
-  segments?: NormSeg[];
-  strength?: number;
-  noiseScale?: number;
-  peakAA?: number;
-}
+const DEFAULT_SEG_FALLOFF = 28.0;
+const DEFAULT_SEG_STRENGTH = 0.7;
+const DEFAULT_PEAK_AA = 4.0;
 
 export interface TopoController {
-  setMode(mode: Mode, opts?: SetModeOpts): void;
+  // Configure landmark peaks and segments. Strengths supplied here are the
+  // BASE strengths — actual contribution scales with morph value each frame.
+  // Passing empty arrays (or omitted fields) clears the previous targets.
+  setMorphTargets(opts: { peaks?: NormPos[]; segments?: NormSeg[] }): void;
+  // Animate morph value (0 = topo, 1 = network) over the given duration.
+  // Pass 0 for an instant set.
+  setMorph(target: number, durationMs?: number): void;
 }
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
   interface Window { __topo?: TopoController; }
+}
+
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
 export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
@@ -223,8 +241,8 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
       uSegParams: { value: new Array(MAX_SEGS * 2).fill(0) },
       uSegCount: { value: 0 },
       uPeakStrength: { value: 1.0 },
-      uNoiseScale: { value: MODE_DEFAULTS.follow.noiseScale },
-      uPeakAA: { value: MODE_DEFAULTS.follow.peakAA },
+      uPeakAA: { value: DEFAULT_PEAK_AA },
+      uMorph: { value: 0 },
     },
   });
   const mesh = new Mesh(gl, { geometry, program });
@@ -238,13 +256,12 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
   resize();
   window.addEventListener('resize', resize);
 
-  let mode: Mode = 'follow';
   const peaks: Peak[] = [];
   const segs: Seg[] = [];
   let lockedPeaks: NormPos[] = [];
   let lockedSegs: NormSeg[] = [];
 
-  // First-paint cursor hidden below the viewport so no hill flashes on load
+  // Mouse-follow peak — index 0, always present.
   const initialOff = [
     window.innerWidth * 0.5 * renderer.dpr,
     -window.innerHeight * 0.6 * renderer.dpr,
@@ -253,7 +270,8 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
     target: [...initialOff],
     current: [...initialOff],
     falloff: DEFAULT_PEAK_FALLOFF,
-    strength: DEFAULT_PEAK_STRENGTH,
+    baseStrength: DEFAULT_PEAK_STRENGTH,
+    role: 'mouse',
   });
 
   const mouseTarget: [number, number] = [...initialOff];
@@ -270,57 +288,63 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
     ];
   }
 
-  function setMode(next: Mode, opts?: SetModeOpts) {
-    mode = next;
-    const defaults = MODE_DEFAULTS[next];
-    program.uniforms.uNoiseScale.value = opts?.noiseScale ?? defaults.noiseScale;
-    program.uniforms.uPeakAA.value = opts?.peakAA ?? defaults.peakAA;
-    program.uniforms.uPeakStrength.value = opts?.strength ?? 1.0;
+  // ---- Morph state ----
+  let morphValue = 0;
+  let morphTarget = 0;
+  let morphFrom = 0;
+  let morphStartTime = 0;
+  let morphDuration = 0;
 
-    const spawn = peaks[0]?.current ?? initialOff;
+  function setMorph(target: number, durationMs = 1000) {
+    const clamped = Math.max(0, Math.min(1, target));
+    if (durationMs <= 0 || clamped === morphValue) {
+      morphValue = clamped;
+      morphTarget = clamped;
+      return;
+    }
+    morphFrom = morphValue;
+    morphTarget = clamped;
+    morphStartTime = performance.now();
+    morphDuration = durationMs;
+  }
 
-    if (next === 'locked') {
-      lockedPeaks = (opts?.peaks ?? []).slice();
-      lockedSegs = (opts?.segments ?? []).slice();
-      peaks.length = 0;
-      segs.length = 0;
-      // Peaks emerge from the current cursor/peak position and disperse out
-      for (const np of lockedPeaks) {
-        peaks.push({
-          target: denorm(np),
-          current: [...spawn],
-          falloff: np.falloff ?? DEFAULT_PEAK_FALLOFF,
-          strength: np.strength ?? DEFAULT_PEAK_STRENGTH,
-        });
-      }
-      // Segments stretch out from the same spawn point — both endpoints
-      // start collapsed there and extend to the nodes they connect.
-      for (const ns of lockedSegs) {
-        segs.push({
-          aTarget: denorm(ns.a),
-          aCurrent: [...spawn],
-          bTarget: denorm(ns.b),
-          bCurrent: [...spawn],
-          falloff: ns.falloff ?? DEFAULT_SEG_FALLOFF,
-          strength: ns.strength ?? DEFAULT_SEG_STRENGTH,
-        });
-      }
-    } else {
-      // follow — collapse to a single mouse-tracked peak; no segments
-      peaks.length = 0;
-      segs.length = 0;
-      lockedPeaks = [];
-      lockedSegs = [];
+  function setMorphTargets(opts: { peaks?: NormPos[]; segments?: NormSeg[] }) {
+    // Remove existing landmark peaks (keep the mouse-follow peak at idx 0)
+    for (let i = peaks.length - 1; i >= 0; i--) {
+      if (peaks[i].role === 'landmark') peaks.splice(i, 1);
+    }
+    const np = opts.peaks ?? [];
+    lockedPeaks = np.slice();
+    for (const p of np) {
+      // Landmark peaks placed AT target — they fade in via strength scaling,
+      // no need to fly in from the cursor (would look like swarming dots).
+      const t = denorm(p);
       peaks.push({
-        target: [...mouseTarget],
-        current: spawn,
-        falloff: DEFAULT_PEAK_FALLOFF,
-        strength: DEFAULT_PEAK_STRENGTH,
+        target: [...t],
+        current: [...t],
+        falloff: p.falloff ?? DEFAULT_PEAK_FALLOFF,
+        baseStrength: p.strength ?? DEFAULT_PEAK_STRENGTH,
+        role: 'landmark',
+      });
+    }
+    const ns = opts.segments ?? [];
+    lockedSegs = ns.slice();
+    segs.length = 0;
+    for (const s of ns) {
+      const a = denorm(s.a);
+      const b = denorm(s.b);
+      segs.push({
+        aTarget: [...a],
+        aCurrent: [...a],
+        bTarget: [...b],
+        bCurrent: [...b],
+        falloff: s.falloff ?? DEFAULT_SEG_FALLOFF,
+        baseStrength: s.strength ?? DEFAULT_SEG_STRENGTH,
       });
     }
   }
 
-  window.__topo = { setMode };
+  window.__topo = { setMorphTargets, setMorph };
 
   function readColors() {
     const styles = getComputedStyle(document.documentElement);
@@ -344,45 +368,71 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
   const segParamUniform = new Array(MAX_SEGS * 2).fill(0) as number[];
 
   function loop() {
-    // Re-derive targets each frame so resize / scroll stay correct
-    if (mode === 'follow' && peaks.length > 0) {
-      peaks[0].target[0] = mouseTarget[0];
-      peaks[0].target[1] = mouseTarget[1];
-    } else if (mode === 'locked') {
-      for (let i = 0; i < peaks.length && i < lockedPeaks.length; i++) {
-        const t = denorm(lockedPeaks[i]);
-        peaks[i].target[0] = t[0];
-        peaks[i].target[1] = t[1];
-      }
-      for (let i = 0; i < segs.length && i < lockedSegs.length; i++) {
-        const ta = denorm(lockedSegs[i].a);
-        const tb = denorm(lockedSegs[i].b);
-        segs[i].aTarget[0] = ta[0];
-        segs[i].aTarget[1] = ta[1];
-        segs[i].bTarget[0] = tb[0];
-        segs[i].bTarget[1] = tb[1];
+    // Advance morph animation
+    if (morphValue !== morphTarget) {
+      const elapsed = (performance.now() - morphStartTime) / morphDuration;
+      if (elapsed >= 1) {
+        morphValue = morphTarget;
+      } else {
+        morphValue = morphFrom + (morphTarget - morphFrom) * easeInOutCubic(elapsed);
       }
     }
+    const m = morphValue;
 
+    // Per-frame strength scaling:
+    //   mouseMul    — fades out as morph progresses (network state has no cursor peak)
+    //   landmarkMul — fades in as morph progresses (small hills under each dot)
+    //   ridgeMul    — bell curve, max at m=0.5 (ridges are TRANSITION state)
+    const mouseMul = 1 - m;
+    const landmarkMul = m;
+    const ridgeMul = m * (1 - m) * 4;
+
+    // Mouse target
+    if (peaks.length > 0 && peaks[0].role === 'mouse') {
+      peaks[0].target[0] = mouseTarget[0];
+      peaks[0].target[1] = mouseTarget[1];
+    }
+    // Re-derive landmark targets on resize
+    let landIdx = 0;
+    for (const p of peaks) {
+      if (p.role !== 'landmark') continue;
+      const np = lockedPeaks[landIdx++];
+      if (np) {
+        const t = denorm(np);
+        p.target[0] = t[0];
+        p.target[1] = t[1];
+      }
+    }
+    for (let i = 0; i < segs.length && i < lockedSegs.length; i++) {
+      const ns = lockedSegs[i];
+      const a = denorm(ns.a);
+      const b = denorm(ns.b);
+      segs[i].aTarget[0] = a[0];
+      segs[i].aTarget[1] = a[1];
+      segs[i].bTarget[0] = b[0];
+      segs[i].bTarget[1] = b[1];
+    }
+
+    // Smooth position pursuit (mostly for the mouse peak — landmarks are at
+    // target already, so this is a no-op for them)
     const k = 0.045;
     for (const p of peaks) {
       p.current[0] += (p.target[0] - p.current[0]) * k;
       p.current[1] += (p.target[1] - p.current[1]) * k;
     }
-    for (const s of segs) {
-      s.aCurrent[0] += (s.aTarget[0] - s.aCurrent[0]) * k;
-      s.aCurrent[1] += (s.aTarget[1] - s.aCurrent[1]) * k;
-      s.bCurrent[0] += (s.bTarget[0] - s.bCurrent[0]) * k;
-      s.bCurrent[1] += (s.bTarget[1] - s.bCurrent[1]) * k;
-    }
 
+    // Pack peaks with morph-scaled strengths
     for (let i = 0; i < MAX_PEAKS; i++) {
       const b = i * 4;
       if (i < peaks.length) {
-        peakUniform[b]     = peaks[i].current[0];
-        peakUniform[b + 1] = peaks[i].current[1];
-        peakUniform[b + 2] = peaks[i].falloff;
-        peakUniform[b + 3] = peaks[i].strength;
+        const p = peaks[i];
+        let eff = p.baseStrength;
+        if (p.role === 'mouse') eff *= mouseMul;
+        else if (p.role === 'landmark') eff *= landmarkMul;
+        peakUniform[b]     = p.current[0];
+        peakUniform[b + 1] = p.current[1];
+        peakUniform[b + 2] = p.falloff;
+        peakUniform[b + 3] = eff;
       } else {
         peakUniform[b]     = 0;
         peakUniform[b + 1] = 0;
@@ -390,16 +440,19 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
         peakUniform[b + 3] = 0;
       }
     }
+    // Pack segments — JS scales strength by the bell curve so ridges only
+    // peak mid-morph and fade at both ends.
     for (let i = 0; i < MAX_SEGS; i++) {
       const b4 = i * 4;
       const b2 = i * 2;
       if (i < segs.length) {
-        segUniform[b4]     = segs[i].aCurrent[0];
-        segUniform[b4 + 1] = segs[i].aCurrent[1];
-        segUniform[b4 + 2] = segs[i].bCurrent[0];
-        segUniform[b4 + 3] = segs[i].bCurrent[1];
-        segParamUniform[b2]     = segs[i].falloff;
-        segParamUniform[b2 + 1] = segs[i].strength;
+        const s = segs[i];
+        segUniform[b4]     = s.aCurrent[0];
+        segUniform[b4 + 1] = s.aCurrent[1];
+        segUniform[b4 + 2] = s.bCurrent[0];
+        segUniform[b4 + 3] = s.bCurrent[1];
+        segParamUniform[b2]     = s.falloff;
+        segParamUniform[b2 + 1] = s.baseStrength * ridgeMul;
       } else {
         segUniform[b4]     = 0;
         segUniform[b4 + 1] = 0;
@@ -415,6 +468,7 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
     program.uniforms.uSegments.value = segUniform;
     program.uniforms.uSegParams.value = segParamUniform;
     program.uniforms.uSegCount.value = Math.min(segs.length, MAX_SEGS);
+    program.uniforms.uMorph.value = morphValue;
     program.uniforms.uTime.value = (performance.now() - start) / 1000;
 
     renderer.render({ scene: mesh });

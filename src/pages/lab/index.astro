@@ -287,12 +287,15 @@ const driftData = {
   }
 
   /* Nodes positioned via CSS custom props that JS updates each frame for
-     the drift effect. The translate(-50%,-50%) centres the dot on the coord. */
+     the drift effect. The dot is the first child (14px tall) and we want
+     ITS centre at the anchor coords so the SVG edges connect to dots,
+     not to the centre of the whole flex column. Hence translate(-50%, -7px)
+     instead of translate(-50%, -50%). */
   .node {
     position: absolute;
     left: var(--node-x, 50%);
     top: var(--node-y, 50%);
-    transform: translate(-50%, -50%);
+    transform: translate(-50%, -7px);
     display: flex;
     flex-direction: column;
     align-items: center;

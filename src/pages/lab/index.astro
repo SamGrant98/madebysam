@@ -76,14 +76,14 @@ const categoryLabels: Record<Category, string> = {
 //             rings against the central peak's slope (falloff 22,
 //             strength 0.6)
 const topoPeaks = [
-  { x: 0.5, y: 0.5, falloff: 3.5, strength: 0.8 },
+  { x: 0.5, y: 0.5, falloff: 3.5, strength: 1.0 },
   ...experiments
     .filter((e) => e.mapPosition)
     .map((e) => ({
       x: e.mapPosition!.x,
       y: e.mapPosition!.y,
       falloff: 22,
-      strength: 0.6,
+      strength: 0.55,
     })),
 ];
 const topoStrength = 1.0;

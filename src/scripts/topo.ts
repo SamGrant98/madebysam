@@ -70,17 +70,15 @@ const fragment = /* glsl */ `
     vec2 res = uResolution;
     vec2 uv = (gl_FragCoord.xy - 0.5 * res) / min(res.x, res.y);
 
-    // Base terrain — static fbm noise field
-    float h = fbm(uv * 1.5);
+    // Gentler base noise — peaks shape the rings, noise only perturbs.
+    float h = 0.55 * fbm(uv * 1.5);
 
-    // A small static wiggle so contour rings feel hand-drawn rather than
-    // perfect mathematical curves. Subtle — too much and the wider peaks
-    // turn lumpy instead of organic.
-    h += 0.006 * (noise(uv * 11.0) - 0.0);
+    // Tiny static wiggle so the rings have a hand-drawn quality instead
+    // of perfect mathematical curves. Subtle enough that the cartography
+    // reads as intentional, not chaotic.
+    h += 0.003 * (noise(uv * 11.0) - 0.0);
 
-    // Accumulate elevation from each active peak. Track the strongest
-    // single-peak influence for adaptive AA.
-    float maxPeakShape = 0.0;
+    // Accumulate elevation from each active peak.
     for (int i = 0; i < MAX_PEAKS; i++) {
       if (i >= uPeakCount) break;
       vec4 pk = uPeaks[i];
@@ -89,18 +87,16 @@ const fragment = /* glsl */ `
       float falloff = max(0.5, pk.z);
       float peakShape = 1.0 / (1.0 + dist * dist * falloff);
       h += pk.w * uPeakStrength * peakShape;
-      maxPeakShape = max(maxPeakShape, peakShape);
     }
 
     float bands = 8.0;
     float v = fract(h * bands);
     float edge = min(v, 1.0 - v);
 
-    // Slightly thinner base line + much less aggressive widening near the
-    // peak (was 4×, now 1.2×) so the central rings stay crisp instead of
-    // smearing together under the wider central mountain.
-    float baseAA = bands / min(res.x, res.y) * 1.2;
-    float aa = baseAA * (1.0 + maxPeakShape * uPeakStrength * 1.2);
+    // Uniform AA across the whole map — lines stay the same thickness
+    // everywhere instead of glowing near the central peak. Reads as
+    // intentional cartography rather than emergent terrain.
+    float aa = bands / min(res.x, res.y) * 1.2;
 
     // Two contour weights — major rings (every 5th) a touch thicker and
     // full-opacity; minors are slim and 25% dimmer.

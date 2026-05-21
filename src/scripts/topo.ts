@@ -97,8 +97,9 @@ const fragment = /* glsl */ `
 
     // Uniform AA across the whole map — lines stay the same thickness
     // everywhere instead of glowing near the central peak. Reads as
-    // intentional cartography rather than emergent terrain.
-    float aa = bands / min(res.x, res.y) * 1.2;
+    // intentional cartography rather than emergent terrain. Thicker
+    // lines so the contour rings have more presence.
+    float aa = bands / min(res.x, res.y) * 2.0;
 
     // Two contour weights — major rings (every 5th) a touch thicker and
     // full-opacity; minors are slim and 25% dimmer.

@@ -251,7 +251,10 @@ const topoStrength = 1.0;
   }
   .map-node {
     position: absolute;
-    transform: translate(-50%, -50%);
+    /* Centred horizontally on the landmark X; vertically the DOT centre
+       sits on the landmark Y (so it lands inside the topo ring nest).
+       The label + meta flow naturally below. -4px = half the dot height. */
+    transform: translate(-50%, -4px);
     pointer-events: auto;
     color: var(--color-fg);
     text-decoration: none;
@@ -271,8 +274,8 @@ const topoStrength = 1.0;
     animation: map-node-in 0.6s ease-out forwards;
   }
   @keyframes map-node-in {
-    from { opacity: 0; transform: translate(-50%, -50%) scale(0.94); }
-    to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    from { opacity: 0; transform: translate(-50%, -4px) scale(0.94); }
+    to   { opacity: 1; transform: translate(-50%, -4px) scale(1); }
   }
   /* Delay timeline: topo needs ~1.6s to morph + settle visibly before
      landmarks should appear. Each subsequent landmark is staggered 220ms

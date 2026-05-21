@@ -40,14 +40,21 @@
     const from = cleanPath(e?.from);
     const to = cleanPath(e?.to);
     if (from === '/lab' && to !== '/lab') {
+      // Body class lets the lab page CSS fade out nodes/edges first
+      document.body.classList.add('lab-leaving');
       window.__topo?.setMorph(0, 700);
       const orig = e.loader;
       e.loader = async () => {
-        // Hold the swap so most of the exit morph plays while the lab DOM
-        // is still on screen, then let Astro finish loading the next page.
-        await new Promise((r) => setTimeout(r, 500));
+        // Hold the swap so the DOM fade + most of the morph play while
+        // the lab is still on screen, then let Astro load the next page.
+        await new Promise((r) => setTimeout(r, 550));
         await orig();
       };
     }
+  });
+
+  // Clear the leaving class once the next page is in
+  document.addEventListener('astro:page-load', () => {
+    document.body.classList.remove('lab-leaving');
   });
 </script>

@@ -75,18 +75,22 @@ const categoryLabels: Record<Category, string> = {
 //   landmark: narrow but with enough strength to form their own visible
 //             rings against the central peak's slope (falloff 22,
 //             strength 0.6)
-// Landmarks ARE the map's features — each one is its own small hill, with
-// the contour rings forming concentric circles centred precisely on its
-// coordinate. No central peak so nothing pulls the local maxima off-centre
-// from the landmark dots above them.
-const topoPeaks = experiments
-  .filter((e) => e.mapPosition)
-  .map((e) => ({
-    x: e.mapPosition!.x,
-    y: e.mapPosition!.y,
-    falloff: 22,
-    strength: 0.7,
-  }));
+// Central peak gives the broader topology — rings spanning the viewport.
+// Landmark peaks are SHARP (high falloff) so their local gradient dominates
+// the central peak's pull near each landmark — meaning the local maximum
+// stays at (or within ~5px of) the landmark's coordinate, so the dot lands
+// inside its ring nest.
+const topoPeaks = [
+  { x: 0.5, y: 0.5, falloff: 3.5, strength: 0.4 },
+  ...experiments
+    .filter((e) => e.mapPosition)
+    .map((e) => ({
+      x: e.mapPosition!.x,
+      y: e.mapPosition!.y,
+      falloff: 60,
+      strength: 0.7,
+    })),
+];
 const topoStrength = 1.0;
 ---
 

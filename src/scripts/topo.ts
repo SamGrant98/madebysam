@@ -70,11 +70,10 @@ const fragment = /* glsl */ `
     vec2 res = uResolution;
     vec2 uv = (gl_FragCoord.xy - 0.5 * res) / min(res.x, res.y);
 
-    // Very subtle base noise — just enough organic curve that rings aren't
-    // perfectly circular, but light enough that the local maximum of each
-    // landmark peak is exactly at the landmark's coordinate (so dots land
-    // dead-centre inside their ring nests on the lab page).
-    float h = 0.1 * fbm(uv * 1.5);
+    // Subtle base noise — enough organic curve that rings have character,
+    // light enough that landmark peaks dominate locally and dots land
+    // (essentially) dead-centre inside their ring nests on the lab page.
+    float h = 0.15 * fbm(uv * 1.5);
 
     // Accumulate elevation from each active peak.
     for (int i = 0; i < MAX_PEAKS; i++) {

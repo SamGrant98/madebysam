@@ -2,8 +2,23 @@
 import Base from '../../layouts/Base.astro';
 
 // When you add an experiment, drop a new entry here.
-// Each one can live at its own route (e.g. src/pages/lab/topo-v2.astro).
-const experiments: { title: string; slug: string; note?: string }[] = [];
+// `slug` → internal route (src/pages/lab/<slug>.astro)
+// `href` → external URL (takes precedence over slug). Use for experiments
+//          that live on their own subdomain / repo.
+interface Experiment {
+  title: string;
+  slug?: string;
+  href?: string;
+  note?: string;
+}
+
+const experiments: Experiment[] = [
+  {
+    title: 'DVD Shelf',
+    href: 'https://dvd.madebysam.dev',
+    note: 'A 3D shelf for your physical media — drop in a CSV, browse in space.',
+  },
+];
 ---
 
 <Base title="lab — made by sam">
@@ -18,7 +33,7 @@ const experiments: { title: string; slug: string; note?: string }[] = [];
         <ul class="grid">
           {experiments.map((x) => (
             <li>
-              <a href={`/lab/${x.slug}`} class="card">
+              <a href={x.href ?? `/lab/${x.slug}`} class="card">
                 <h3>{x.title}</h3>
                 {x.note && <p>{x.note}</p>}
               </a>

@@ -71,17 +71,19 @@ const categoryLabels: Record<Category, string> = {
 // Wide central "mountain" + a small hill under each landmark so the
 // terrain reads as a real map. Falloff: lower = wider peak. Strength:
 // the per-peak elevation multiplier.
-//   central:  wide & dominant       (falloff ~3.5, strength 1.0)
-//   landmark: narrow & subtle hills (falloff ~22,  strength 0.25)
+//   central:  wide, slightly less tall so the gradient doesn't bunch all
+//             contour bands into a tight blob (falloff 3.5, strength 0.8)
+//   landmark: narrow but noticeable hills you can actually see as their
+//             own rings (falloff 22, strength 0.45)
 const topoPeaks = [
-  { x: 0.5, y: 0.5, falloff: 3.5, strength: 1.0 },
+  { x: 0.5, y: 0.5, falloff: 3.5, strength: 0.8 },
   ...experiments
     .filter((e) => e.mapPosition)
     .map((e) => ({
       x: e.mapPosition!.x,
       y: e.mapPosition!.y,
       falloff: 22,
-      strength: 0.25,
+      strength: 0.45,
     })),
 ];
 const topoStrength = 1.0;

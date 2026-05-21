@@ -74,9 +74,9 @@ const fragment = /* glsl */ `
     float h = fbm(uv * 1.5);
 
     // A small static wiggle so contour rings feel hand-drawn rather than
-    // perfect mathematical curves. Static (no uTime) so the map reads as
-    // settled, not animated.
-    h += 0.012 * (noise(uv * 11.0) - 0.0);
+    // perfect mathematical curves. Subtle — too much and the wider peaks
+    // turn lumpy instead of organic.
+    h += 0.006 * (noise(uv * 11.0) - 0.0);
 
     // Accumulate elevation from each active peak. Track the strongest
     // single-peak influence for adaptive AA.
@@ -96,14 +96,16 @@ const fragment = /* glsl */ `
     float v = fract(h * bands);
     float edge = min(v, 1.0 - v);
 
-    float baseAA = bands / min(res.x, res.y) * 1.5;
-    float aa = baseAA * (1.0 + maxPeakShape * uPeakStrength * 4.0);
+    // Slightly thinner base line + much less aggressive widening near the
+    // peak (was 4×, now 1.2×) so the central rings stay crisp instead of
+    // smearing together under the wider central mountain.
+    float baseAA = bands / min(res.x, res.y) * 1.2;
+    float aa = baseAA * (1.0 + maxPeakShape * uPeakStrength * 1.2);
 
-    // Two contour weights — major rings (every 5th) are noticeably thicker
-    // and full-opacity; minor rings are thinner and 25% dimmer. Reads like
-    // a real cartographic map's index-vs-intermediate-contour rhythm.
+    // Two contour weights — major rings (every 5th) a touch thicker and
+    // full-opacity; minors are slim and 25% dimmer.
     float minorLine = 1.0 - smoothstep(0.0, aa, edge);
-    float majorLine = 1.0 - smoothstep(0.0, aa * 1.8, edge);
+    float majorLine = 1.0 - smoothstep(0.0, aa * 1.5, edge);
     float bandNum = floor(h * bands);
     float isMajor = step(mod(bandNum, 5.0), 0.5);
     float line = mix(minorLine * 0.75, majorLine, isMajor);

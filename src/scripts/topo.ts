@@ -27,9 +27,14 @@ const fragment = /* glsl */ `
   uniform vec3  uLine;
 
   const int MAX_PEAKS = ${MAX_PEAKS};
-  uniform vec2  uPeaks[MAX_PEAKS];   // peak positions in screen-pixel space
-  uniform int   uPeakCount;          // how many of the array slots are active
-  uniform float uPeakStrength;       // per-peak elevation multiplier
+  // Each peak packs:  xy = screen-pixel position
+  //                   z  = falloff coefficient (higher = narrower, sharper)
+  //                   w  = per-peak elevation strength
+  // This lets a single "central mountain" be wide + tall while landmark
+  // hills can be narrow + subtle in the same render.
+  uniform vec4  uPeaks[MAX_PEAKS];
+  uniform int   uPeakCount;
+  uniform float uPeakStrength;       // global multiplier for crossfading
 
   vec2 hash2(vec2 p) {
     p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
@@ -78,10 +83,12 @@ const fragment = /* glsl */ `
     float maxPeakShape = 0.0;
     for (int i = 0; i < MAX_PEAKS; i++) {
       if (i >= uPeakCount) break;
-      vec2 peakUv = (uPeaks[i] - 0.5 * res) / min(res.x, res.y);
+      vec4 pk = uPeaks[i];
+      vec2 peakUv = (pk.xy - 0.5 * res) / min(res.x, res.y);
       float dist = length(uv - peakUv);
-      float peakShape = 1.0 / (1.0 + dist * dist * 8.0);
-      h += 0.55 * uPeakStrength * peakShape;
+      float falloff = max(0.5, pk.z);
+      float peakShape = 1.0 / (1.0 + dist * dist * falloff);
+      h += pk.w * uPeakStrength * peakShape;
       maxPeakShape = max(maxPeakShape, peakShape);
     }
 
@@ -117,8 +124,17 @@ function hexToRgb(hex: string): [number, number, number] | null {
 }
 
 type Mode = 'follow' | 'locked';
-type Peak = { target: [number, number]; current: [number, number] };
-type NormPos = { x: number; y: number };
+type Peak = {
+  target: [number, number];
+  current: [number, number];
+  falloff: number;
+  strength: number;
+};
+type NormPos = { x: number; y: number; falloff?: number; strength?: number };
+
+// Defaults that match the original single-peak look — used in follow mode.
+const DEFAULT_FALLOFF = 8.0;
+const DEFAULT_STRENGTH = 0.55;
 
 // Exposed controller. /lab calls setMode('locked') with peak positions; other
 // pages can call setMode('follow') to return to the cursor-tracking behaviour.
@@ -152,7 +168,7 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
       uTime: { value: 0 },
       uBg: { value: [0, 0, 0] },
       uLine: { value: [1, 1, 1] },
-      uPeaks: { value: new Array(MAX_PEAKS * 2).fill(0) },
+      uPeaks: { value: new Array(MAX_PEAKS * 4).fill(0) },
       uPeakCount: { value: 0 },
       uPeakStrength: { value: 1.0 },
     },
@@ -182,7 +198,12 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
     window.innerWidth * 0.5 * renderer.dpr,
     -window.innerHeight * 0.6 * renderer.dpr,
   ] as [number, number];
-  peaks.push({ target: [...initialOff], current: [...initialOff] });
+  peaks.push({
+    target: [...initialOff],
+    current: [...initialOff],
+    falloff: DEFAULT_FALLOFF,
+    strength: DEFAULT_STRENGTH,
+  });
 
   const mouseTarget: [number, number] = [...initialOff];
   function onPointer(e: PointerEvent) {
@@ -206,21 +227,29 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
       // New peaks emerge from wherever the existing first peak currently is
       // (typically the cursor) and disperse to their target positions.
       const spawn = peaks[0]?.current ?? initialOff;
-      const targets = lockedPositions.map(denorm);
       peaks.length = 0;
-      for (const target of targets) {
-        peaks.push({ target, current: [...spawn] });
+      for (const np of lockedPositions) {
+        peaks.push({
+          target: denorm(np),
+          current: [...spawn],
+          falloff: np.falloff ?? DEFAULT_FALLOFF,
+          strength: np.strength ?? DEFAULT_STRENGTH,
+        });
       }
     } else {
       // follow mode — single peak; inherits current value from peaks[0] so
       // the morph back is smooth.
       const spawn = peaks[0]?.current ?? [...initialOff];
       peaks.length = 0;
-      peaks.push({ target: [...mouseTarget], current: spawn });
+      peaks.push({
+        target: [...mouseTarget],
+        current: spawn,
+        falloff: DEFAULT_FALLOFF,
+        strength: DEFAULT_STRENGTH,
+      });
     }
-    // Strength: caller-supplied for locked mode, default 1 for follow.
-    program.uniforms.uPeakStrength.value =
-      opts?.strength ?? (next === 'locked' ? 1.0 : 1.0);
+    // Optional global multiplier for crossfades — default 1.0.
+    program.uniforms.uPeakStrength.value = opts?.strength ?? 1.0;
   }
 
   function setPeaks(newPeaks: NormPos[]) {
@@ -247,7 +276,7 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
 
   const start = performance.now();
   let rafId = 0;
-  const peakUniform = new Array(MAX_PEAKS * 2).fill(0) as number[];
+  const peakUniform = new Array(MAX_PEAKS * 4).fill(0) as number[];
 
   function loop() {
     // Refresh targets every frame:
@@ -271,14 +300,19 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
       p.current[1] += (p.target[1] - p.current[1]) * 0.045;
     }
 
-    // Pack peak positions into the flat uniform array
+    // Pack peaks into the flat vec4 uniform array (xy = pos, z = falloff, w = strength).
     for (let i = 0; i < MAX_PEAKS; i++) {
+      const base = i * 4;
       if (i < peaks.length) {
-        peakUniform[i * 2] = peaks[i].current[0];
-        peakUniform[i * 2 + 1] = peaks[i].current[1];
+        peakUniform[base]     = peaks[i].current[0];
+        peakUniform[base + 1] = peaks[i].current[1];
+        peakUniform[base + 2] = peaks[i].falloff;
+        peakUniform[base + 3] = peaks[i].strength;
       } else {
-        peakUniform[i * 2] = 0;
-        peakUniform[i * 2 + 1] = 0;
+        peakUniform[base]     = 0;
+        peakUniform[base + 1] = 0;
+        peakUniform[base + 2] = 1;
+        peakUniform[base + 3] = 0;
       }
     }
     program.uniforms.uPeaks.value = peakUniform;

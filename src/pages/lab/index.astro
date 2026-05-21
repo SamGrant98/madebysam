@@ -68,11 +68,23 @@ const categoryLabels: Record<Category, string> = {
   'tools': 'Tools',
 };
 
-// One central peak — landmarks sit on the rings that emanate outward from
-// it like terrain features around a mountain. Stronger than the default
-// mouse-follow peak so the topology reads as a definite landform.
-const topoPeaks = [{ x: 0.5, y: 0.5 }];
-const topoStrength = 1.6;
+// Wide central "mountain" + a small hill under each landmark so the
+// terrain reads as a real map. Falloff: lower = wider peak. Strength:
+// the per-peak elevation multiplier.
+//   central:  wide & dominant       (falloff ~3.5, strength 1.0)
+//   landmark: narrow & subtle hills (falloff ~22,  strength 0.25)
+const topoPeaks = [
+  { x: 0.5, y: 0.5, falloff: 3.5, strength: 1.0 },
+  ...experiments
+    .filter((e) => e.mapPosition)
+    .map((e) => ({
+      x: e.mapPosition!.x,
+      y: e.mapPosition!.y,
+      falloff: 22,
+      strength: 0.25,
+    })),
+];
+const topoStrength = 1.0;
 ---
 
 <Base title="lab — made by sam">

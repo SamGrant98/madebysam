@@ -68,6 +68,11 @@ const fragment = /* glsl */ `
     // Base terrain — static fbm noise field
     float h = fbm(uv * 1.5);
 
+    // A small static wiggle so contour rings feel hand-drawn rather than
+    // perfect mathematical curves. Static (no uTime) so the map reads as
+    // settled, not animated.
+    h += 0.012 * (noise(uv * 11.0) - 0.0);
+
     // Accumulate elevation from each active peak. Track the strongest
     // single-peak influence for adaptive AA.
     float maxPeakShape = 0.0;
@@ -86,7 +91,15 @@ const fragment = /* glsl */ `
 
     float baseAA = bands / min(res.x, res.y) * 1.5;
     float aa = baseAA * (1.0 + maxPeakShape * uPeakStrength * 4.0);
-    float line = 1.0 - smoothstep(0.0, aa, edge);
+
+    // Two contour weights — major rings (every 5th) are noticeably thicker
+    // and full-opacity; minor rings are thinner and 25% dimmer. Reads like
+    // a real cartographic map's index-vs-intermediate-contour rhythm.
+    float minorLine = 1.0 - smoothstep(0.0, aa, edge);
+    float majorLine = 1.0 - smoothstep(0.0, aa * 1.8, edge);
+    float bandNum = floor(h * bands);
+    float isMajor = step(mod(bandNum, 5.0), 0.5);
+    float line = mix(minorLine * 0.75, majorLine, isMajor);
 
     vec3 col = mix(uBg, uLine, line);
     gl_FragColor = vec4(col, 1.0);

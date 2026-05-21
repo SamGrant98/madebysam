@@ -70,15 +70,11 @@ const fragment = /* glsl */ `
     vec2 res = uResolution;
     vec2 uv = (gl_FragCoord.xy - 0.5 * res) / min(res.x, res.y);
 
-    // Very gentle base noise — the terrain reads as mostly flat, with the
-    // landmark + central peaks providing all the meaningful elevation.
-    // Less noise = the landmark hills clearly own their territory rather
-    // than fighting random ridges.
-    float h = 0.3 * fbm(uv * 1.5);
-
-    // Tiny static wiggle so the rings have a hand-drawn quality instead
-    // of perfect mathematical curves.
-    h += 0.003 * (noise(uv * 11.0) - 0.0);
+    // Very subtle base noise — just enough organic curve that rings aren't
+    // perfectly circular, but light enough that the local maximum of each
+    // landmark peak is exactly at the landmark's coordinate (so dots land
+    // dead-centre inside their ring nests on the lab page).
+    float h = 0.1 * fbm(uv * 1.5);
 
     // Accumulate elevation from each active peak.
     for (int i = 0; i < MAX_PEAKS; i++) {

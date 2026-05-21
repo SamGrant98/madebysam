@@ -75,20 +75,18 @@ const categoryLabels: Record<Category, string> = {
 //   landmark: narrow but with enough strength to form their own visible
 //             rings against the central peak's slope (falloff 22,
 //             strength 0.6)
-// Flatter terrain so the landmarks ARE the features. Central peak is a
-// gentle rise toward the centre (low strength + wide falloff); landmarks
-// stand on top of it as clearer little hills.
-const topoPeaks = [
-  { x: 0.5, y: 0.5, falloff: 3.5, strength: 0.4 },
-  ...experiments
-    .filter((e) => e.mapPosition)
-    .map((e) => ({
-      x: e.mapPosition!.x,
-      y: e.mapPosition!.y,
-      falloff: 22,
-      strength: 0.6,
-    })),
-];
+// Landmarks ARE the map's features — each one is its own small hill, with
+// the contour rings forming concentric circles centred precisely on its
+// coordinate. No central peak so nothing pulls the local maxima off-centre
+// from the landmark dots above them.
+const topoPeaks = experiments
+  .filter((e) => e.mapPosition)
+  .map((e) => ({
+    x: e.mapPosition!.x,
+    y: e.mapPosition!.y,
+    falloff: 22,
+    strength: 0.7,
+  }));
 const topoStrength = 1.0;
 ---
 

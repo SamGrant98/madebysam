@@ -1,65 +1,185 @@
 ---
 import Base from '../../layouts/Base.astro';
 
-// When you add an experiment, drop a new entry here.
-// `slug` → internal route (src/pages/lab/<slug>.astro)
-// `href` → external URL (takes precedence over slug). Use for experiments
-//          that live on their own subdomain / repo.
+// Lab entries — one shipped (DVD Shelf) and a few sketches so the map has
+// something to populate. Edit titles, blurbs, categories and mapPosition
+// freely. mapPosition uses normalised viewport coords (0..1 each axis).
+//
+// status:
+//   'live'      — actually deployed, clickable, navigates to href/slug
+//   'sketching' — in progress / planned, dimmed, not clickable
+//   'parked'    — backburner, greyed further
+
+type Category = 'three-d' | 'generative' | 'data' | 'audio' | 'tools';
+type Status = 'live' | 'sketching' | 'parked';
+
 interface Experiment {
+  id: string;
   title: string;
   slug?: string;
   href?: string;
+  category: Category;
+  status: Status;
   note?: string;
+  mapPosition?: { x: number; y: number };
 }
 
 const experiments: Experiment[] = [
   {
+    id: 'dvd-shelf',
     title: 'DVD Shelf',
     href: 'https://dvd.madebysam.dev',
+    category: 'three-d',
+    status: 'live',
     note: 'A 3D shelf for your physical media — drop in a CSV, browse in space.',
+    mapPosition: { x: 0.72, y: 0.34 },
+  },
+  {
+    id: 'topo-playground',
+    title: 'Topo Playground',
+    category: 'generative',
+    status: 'sketching',
+    note: 'Configurable contour-map generator. Same shader as this background, with knobs.',
+    mapPosition: { x: 0.26, y: 0.3 },
+  },
+  {
+    id: 'audio-reactive',
+    title: 'Audio Reactive',
+    category: 'audio',
+    status: 'sketching',
+    note: 'Mic input drives a shader — volume, frequency, beat.',
+    mapPosition: { x: 0.22, y: 0.66 },
+  },
+  {
+    id: 'palette-generator',
+    title: 'Palette Generator',
+    category: 'tools',
+    status: 'sketching',
+    note: 'Throw a photo at it, get a colour system out.',
+    mapPosition: { x: 0.74, y: 0.7 },
   },
 ];
+
+const categoryLabels: Record<Category, string> = {
+  'three-d': '3D',
+  'generative': 'Generative',
+  'data': 'Data',
+  'audio': 'Audio',
+  'tools': 'Tools',
+};
 ---
 
 <Base title="lab — made by sam">
-  <section class="lab">
-    <h1>Lab</h1>
-    <p class="lede">A place to play. Experiments from the Obsidian vault, in public.</p>
+  <section class="lab" data-mode="map">
+    <header class="lab-header">
+      <div class="lab-intro">
+        <h1>Lab</h1>
+        <p class="lede">A place to play. Experiments from the Obsidian vault, in public.</p>
+      </div>
+      <div class="mode-toggle" role="tablist" aria-label="Lab view mode">
+        <button data-mode="map" class="mode-btn is-active" aria-selected="true">Map</button>
+        <button data-mode="list" class="mode-btn" aria-selected="false">List</button>
+      </div>
+    </header>
 
-    {
-      experiments.length === 0 ? (
-        <p class="empty">Nothing here yet — come back soon.</p>
-      ) : (
-        <ul class="grid">
-          {experiments.map((x) => (
-            <li>
-              <a href={x.href ?? `/lab/${x.slug}`} class="card">
-                <h3>{x.title}</h3>
-                {x.note && <p>{x.note}</p>}
-              </a>
-            </li>
-          ))}
+    {experiments.length === 0 ? (
+      <p class="empty">Nothing here yet — come back soon.</p>
+    ) : (
+      <>
+        {/* MAP VIEW — landmarks scattered over the topo. Sits fixed over
+            the viewport so the topo background reads as the terrain. */}
+        <div class="lab-map">
+          {experiments.map((exp) => {
+            const isLive = exp.status === 'live';
+            const href = exp.href ?? (exp.slug ? `/lab/${exp.slug}` : undefined);
+            const x = (exp.mapPosition?.x ?? 0.5) * 100;
+            const y = (exp.mapPosition?.y ?? 0.5) * 100;
+            const classes = `map-node map-node--${exp.status} map-node--${exp.category}`;
+            const style = `left: ${x}%; top: ${y}%;`;
+            return (
+              <>
+                {isLive && href ? (
+                  <a href={href} class={classes} style={style}>
+                    <span class="map-node__dot" aria-hidden="true"></span>
+                    <span class="map-node__label">{exp.title}</span>
+                    <span class="map-node__meta">
+                      <span class="map-node__cat">{categoryLabels[exp.category]}</span>
+                    </span>
+                    {exp.note && <span class="map-node__note">{exp.note}</span>}
+                  </a>
+                ) : (
+                  <div class={classes} style={style} aria-disabled="true" tabindex="0">
+                    <span class="map-node__dot" aria-hidden="true"></span>
+                    <span class="map-node__label">{exp.title}</span>
+                    <span class="map-node__meta">
+                      <span class="map-node__cat">{categoryLabels[exp.category]}</span>
+                      <span class="map-node__status">{exp.status}</span>
+                    </span>
+                    {exp.note && <span class="map-node__note">{exp.note}</span>}
+                  </div>
+                )}
+              </>
+            );
+          })}
+        </div>
+
+        {/* LIST VIEW — fallback / reduced-motion / mobile default */}
+        <ul class="lab-list">
+          {experiments.map((exp) => {
+            const isLive = exp.status === 'live';
+            const href = exp.href ?? (exp.slug ? `/lab/${exp.slug}` : undefined);
+            return (
+              <li>
+                {isLive && href ? (
+                  <a href={href} class={`list-card list-card--${exp.status}`}>
+                    <h3>{exp.title}</h3>
+                    <div class="list-card__meta">
+                      <span>{categoryLabels[exp.category]}</span>
+                    </div>
+                    {exp.note && <p>{exp.note}</p>}
+                  </a>
+                ) : (
+                  <div class={`list-card list-card--${exp.status}`} aria-disabled="true">
+                    <h3>{exp.title}</h3>
+                    <div class="list-card__meta">
+                      <span>{categoryLabels[exp.category]}</span>
+                      <span class="list-card__status">{exp.status}</span>
+                    </div>
+                    {exp.note && <p>{exp.note}</p>}
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
-      )
-    }
+      </>
+    )}
   </section>
 </Base>
 
 <style>
   .lab {
+    position: relative;
     max-width: 56rem;
     margin: 0 auto;
     padding: calc(var(--space-8) * 1.5) var(--space-4) var(--space-8);
+  }
+  .lab-header {
     display: flex;
-    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
     gap: var(--space-3);
+    margin-bottom: var(--space-5);
+    flex-wrap: wrap;
   }
   h1 {
     font-size: clamp(2rem, 5vw, 3rem);
+    margin-bottom: var(--space-1);
   }
   .lede {
     color: var(--color-fg);
     opacity: 0.75;
+    max-width: 36rem;
   }
   .empty {
     font-family: var(--font-mono);
@@ -67,34 +187,245 @@ const experiments: Experiment[] = [
     opacity: 0.6;
     padding: var(--space-4) 0;
   }
-  .grid {
+
+  /* ===== Mode toggle ===== */
+  .mode-toggle {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid color-mix(in oklab, var(--color-fg) 15%, transparent);
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--color-bg) 70%, transparent);
+    backdrop-filter: blur(6px);
+  }
+  .mode-btn {
+    border: 0;
+    background: transparent;
+    color: color-mix(in oklab, var(--color-fg) 60%, transparent);
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: color var(--transition), background var(--transition);
+  }
+  .mode-btn:hover { color: var(--color-fg); }
+  .mode-btn.is-active {
+    background: color-mix(in oklab, var(--color-fg) 12%, transparent);
+    color: var(--color-fg);
+  }
+
+  /* ===== Mode-driven visibility ===== */
+  .lab[data-mode='map'] .lab-list { display: none; }
+  .lab[data-mode='list'] .lab-map { display: none; }
+
+  /* ===== MAP VIEW ===== */
+  .lab-map {
+    position: fixed;
+    inset: 0;
+    pointer-events: none; /* topo + scroll pass through; nodes opt back in */
+    z-index: 2;
+  }
+  .map-node {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+    color: var(--color-fg);
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    max-width: 14rem;
+    text-align: center;
+    text-shadow:
+      0 0 8px var(--color-bg),
+      0 0 20px var(--color-bg);
+  }
+  .map-node__dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--color-fg);
+    transition:
+      transform var(--transition),
+      box-shadow var(--transition),
+      background var(--transition),
+      border-color var(--transition);
+  }
+  .map-node:hover .map-node__dot,
+  .map-node:focus-visible .map-node__dot {
+    transform: scale(1.35);
+    box-shadow: 0 0 0 8px color-mix(in oklab, var(--color-accent) 25%, transparent);
+  }
+  .map-node__label {
+    font-weight: 500;
+    font-size: 1rem;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    transition: color var(--transition);
+  }
+  .map-node__meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .map-node__cat { opacity: 0.55; }
+  .map-node__status {
+    color: var(--color-accent);
+    opacity: 0.85;
+  }
+  .map-node__note {
+    margin-top: 6px;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    color: color-mix(in oklab, var(--color-fg) 70%, transparent);
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: opacity var(--transition), max-height var(--transition);
+  }
+  .map-node:hover .map-node__note,
+  .map-node:focus-visible .map-node__note {
+    opacity: 1;
+    max-height: 7em;
+  }
+
+  /* Live nodes — pop on hover */
+  .map-node--live:hover .map-node__label,
+  .map-node--live:focus-visible .map-node__label {
+    color: var(--color-accent);
+  }
+
+  /* Sketching / parked — dim, dashed, no pointer */
+  .map-node--sketching,
+  .map-node--parked {
+    cursor: default;
+  }
+  .map-node--sketching .map-node__dot,
+  .map-node--parked .map-node__dot {
+    background: transparent;
+    border: 1.5px dashed color-mix(in oklab, var(--color-fg) 45%, transparent);
+  }
+  .map-node--sketching .map-node__label,
+  .map-node--parked .map-node__label {
+    color: color-mix(in oklab, var(--color-fg) 65%, transparent);
+  }
+  .map-node--parked .map-node__dot {
+    border-style: dotted;
+  }
+
+  /* ===== LIST VIEW ===== */
+  .lab-list {
     list-style: none;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
     gap: var(--space-2);
+    padding: 0;
+    margin: 0;
   }
-  .card {
+  .list-card {
     display: block;
     padding: var(--space-3);
     border: 1px solid color-mix(in oklab, var(--color-fg) 15%, transparent);
     border-radius: var(--radius);
-    transition:
-      border-color var(--transition),
-      color var(--transition);
+    transition: border-color var(--transition), color var(--transition);
+    color: inherit;
   }
-  .card:hover {
+  .list-card[aria-disabled='true'] {
+    opacity: 0.6;
+    cursor: default;
+  }
+  .list-card:hover {
     border-color: var(--color-accent);
   }
-  .card:hover h3 {
+  .list-card[aria-disabled='true']:hover {
+    border-color: color-mix(in oklab, var(--color-fg) 15%, transparent);
+  }
+  .list-card:hover h3 {
     color: var(--color-accent);
   }
-  .card h3 {
+  .list-card[aria-disabled='true']:hover h3 {
+    color: inherit;
+  }
+  .list-card h3 {
     font-size: 1.05rem;
     margin-bottom: var(--space-1);
   }
-  .card p {
+  .list-card__meta {
+    display: flex;
+    gap: 8px;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.6;
+    margin-bottom: var(--space-1);
+  }
+  .list-card__status {
+    color: var(--color-accent);
+    opacity: 0.9;
+  }
+  .list-card p {
     font-size: 0.9rem;
     color: var(--color-fg);
-    opacity: 0.7;
+    opacity: 0.75;
+    margin: 0;
+  }
+
+  /* ===== Narrow screens ===== */
+  @media (max-width: 720px) {
+    .lab-header {
+      flex-direction: column-reverse;
+      align-items: flex-start;
+    }
   }
 </style>
+
+<script>
+  // Mode toggle: map / list. Default chosen by environment — list on
+  // reduced-motion OR coarse-pointer (mobile) so the page is usable
+  // without a precise pointer. Choice is persisted to localStorage so a
+  // user's explicit pick wins next visit.
+  function initLab() {
+    const section = document.querySelector<HTMLElement>('.lab');
+    if (!section) return;
+    const toggle = section.querySelector('.mode-toggle');
+    const btns = section.querySelectorAll<HTMLButtonElement>('.mode-btn');
+
+    function getInitialMode(): 'map' | 'list' {
+      try {
+        const stored = localStorage.getItem('lab-mode');
+        if (stored === 'map' || stored === 'list') return stored;
+      } catch {}
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return 'list';
+      if (window.matchMedia('(pointer: coarse)').matches) return 'list';
+      return 'map';
+    }
+
+    function applyMode(mode: 'map' | 'list') {
+      section!.setAttribute('data-mode', mode);
+      btns.forEach((b) => {
+        const isActive = b.getAttribute('data-mode') === mode;
+        b.classList.toggle('is-active', isActive);
+        b.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      });
+    }
+
+    applyMode(getInitialMode());
+
+    toggle?.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement)?.closest<HTMLButtonElement>('.mode-btn');
+      if (!btn) return;
+      const mode = btn.getAttribute('data-mode');
+      if (mode !== 'map' && mode !== 'list') return;
+      applyMode(mode);
+      try { localStorage.setItem('lab-mode', mode); } catch {}
+    });
+  }
+
+  document.addEventListener('astro:page-load', initLab);
+  initLab();
+</script>

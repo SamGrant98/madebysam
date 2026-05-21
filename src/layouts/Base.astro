@@ -46,6 +46,36 @@ const {
 
     {/* Client-side routing so the topo canvas, WebGL state, and mouse position persist between pages */}
     <ClientRouter />
+
+    {/* Outbound fade for cross-origin links (sibling subdomains).
+        Re-runs on every Astro page-load so re-rendered cards keep working. */}
+    <script>
+      function bindCrossOriginFade() {
+        document
+          .querySelectorAll('a[href*="madebysam.dev"]:not([data-fade-bound])')
+          .forEach((a) => {
+            const href = a.getAttribute('href') || '';
+            // Only intercept actual cross-origin links (anything that
+            // doesn't start with "/" and isn't pointing at our own origin)
+            if (!/^https?:\/\//.test(href)) return;
+            try {
+              const url = new URL(href);
+              if (url.origin === window.location.origin) return;
+            } catch { return; }
+
+            a.setAttribute('data-fade-bound', '1');
+            a.addEventListener('click', (e) => {
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+              if (a.target === '_blank') return;
+              e.preventDefault();
+              document.body.classList.add('is-leaving');
+              setTimeout(() => { window.location.href = a.href; }, 300);
+            });
+          });
+      }
+      document.addEventListener('astro:page-load', bindCrossOriginFade);
+      bindCrossOriginFade();
+    </script>
   </head>
   <body>
     {showTopo && <TopoCanvas />}
@@ -97,6 +127,17 @@ const {
     position: relative;
     z-index: 1;
     min-height: 100vh;
+  }
+
+  /* Cross-origin page fade. Internal Astro nav already animates via
+     ClientRouter; this only kicks in for the inbound paint and for outbound
+     clicks to sibling subdomains (e.g. dvd.madebysam.dev), so the jump
+     across origins feels continuous instead of a hard cut. */
+  body { animation: page-fade-in 0.4s ease-out; }
+  body.is-leaving { transition: opacity 0.3s ease-out; opacity: 0; }
+  @keyframes page-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
 
   /* Shared halo for readable text over the topo background */

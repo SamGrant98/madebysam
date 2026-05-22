@@ -1,0 +1,226 @@
+---
+import { getCollection, render } from 'astro:content';
+import { Image, getImage } from 'astro:assets';
+import Base from '../../layouts/Base.astro';
+
+export async function getStaticPaths() {
+  const entries = await getCollection('lab');
+  return entries.map((entry) => ({
+    params: { slug: entry.id },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+const data = entry.data;
+
+// Generate a 1200×630 PNG version of the screenshot for the OG card.
+// PNG (not avif/webp) because some social crawlers — notably LinkedIn and
+// older Slack — still don't render webp previews reliably. If no screenshot
+// is set, Base falls back to /og-default.png.
+const ogImage = data.screenshot
+  ? (await getImage({ src: data.screenshot, format: 'png', width: 1200, height: 630, fit: 'cover' })).src
+  : undefined;
+
+const categoryLabels = {
+  'three-d': '3D',
+  'generative': 'Generative',
+  'data': 'Data',
+  'audio': 'Audio',
+  'tools': 'Tools',
+} as const;
+---
+
+<Base
+  title={`${data.title} — made by sam`}
+  description={data.blurb}
+  ogImage={ogImage}
+  breadcrumb={[
+    { label: 'lab', href: '/lab' },
+    { label: data.title },
+  ]}
+>
+  <article class="demo">
+    <header class="demo__header">
+      <h1>{data.title}</h1>
+      <p class="lede">{data.blurb}</p>
+      <div class="demo__meta">
+        <span class="meta-item">{categoryLabels[data.category]}</span>
+        <span class={`meta-item status status--${data.status}`}>{data.status}</span>
+      </div>
+    </header>
+
+    {data.screenshot && (
+      <figure class="demo__screenshot">
+        <Image src={data.screenshot} alt={`${data.title} hero`} loading="eager" />
+      </figure>
+    )}
+
+    {data.stack.length > 0 && (
+      <section class="demo__stack" aria-label="Stack">
+        {data.stack.map((tech) => <span class="chip">{tech}</span>)}
+      </section>
+    )}
+
+    <div class="demo__body">
+      <Content />
+    </div>
+
+    {data.gallery.length > 0 && (
+      <section class="demo__gallery" aria-label="More images">
+        {data.gallery.map((g) => (
+          <figure>
+            <Image src={g.src} alt={g.alt ?? ''} loading="lazy" />
+            {g.caption && <figcaption>{g.caption}</figcaption>}
+          </figure>
+        ))}
+      </section>
+    )}
+
+    {data.href && (
+      <a class="demo__cta" href={data.href}>
+        View live <span aria-hidden="true">→</span>
+      </a>
+    )}
+  </article>
+</Base>
+
+<style>
+  .demo {
+    max-width: 44rem;
+    margin: 0 auto;
+    padding: calc(var(--space-8) * 1.5) var(--space-4) var(--space-8);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+  }
+
+  .demo__header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .demo__header h1 {
+    font-size: clamp(2rem, 5vw, 3rem);
+  }
+  .lede {
+    font-size: 1.15rem;
+    color: var(--color-fg);
+    opacity: 0.85;
+    max-width: 38rem;
+  }
+
+  .demo__meta {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-1);
+  }
+  .meta-item {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.7;
+  }
+  .status--live { color: var(--color-accent); opacity: 1; }
+  .status--sketching,
+  .status--parked { opacity: 0.55; }
+
+  .demo__screenshot {
+    margin: 0;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+  }
+  .demo__screenshot img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .demo__gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: var(--space-3);
+  }
+  .demo__gallery figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .demo__gallery img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius);
+    border: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+  }
+  .demo__gallery figcaption {
+    font-size: 0.78rem;
+    opacity: 0.6;
+    line-height: 1.4;
+  }
+
+  .demo__stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chip {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border: 1px solid color-mix(in oklab, var(--color-fg) 18%, transparent);
+    border-radius: 999px;
+    color: var(--color-fg);
+    opacity: 0.85;
+  }
+
+  /* Rendered markdown body */
+  .demo__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    line-height: 1.65;
+    color: var(--color-fg);
+  }
+  .demo__body :global(h2) {
+    font-size: 1.25rem;
+    margin-top: var(--space-3);
+    font-weight: 500;
+  }
+  .demo__body :global(p) {
+    opacity: 0.88;
+  }
+  .demo__body :global(em) {
+    opacity: 0.55;
+    font-style: italic;
+  }
+  .demo__body :global(a) {
+    color: var(--color-accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .demo__cta {
+    align-self: flex-start;
+    margin-top: var(--space-3);
+    padding: 10px 18px;
+    border-radius: var(--radius);
+    border: 1px solid var(--color-accent);
+    color: var(--color-accent);
+    text-decoration: none;
+    font-weight: 500;
+    transition: background var(--transition), color var(--transition);
+  }
+  .demo__cta:hover {
+    background: var(--color-accent);
+    color: var(--color-bg);
+  }
+  .demo__cta span {
+    display: inline-block;
+    transition: transform var(--transition);
+    margin-left: 4px;
+  }
+  .demo__cta:hover span { transform: translateX(3px); }
+</style>

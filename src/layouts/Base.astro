@@ -116,7 +116,7 @@ const resolvedOgImage = new URL(ogImage ?? '/og-default.png', Astro.site).href;
   </head>
   <body>
     {showTopo && <TopoCanvas />}
-    <header class="site-header" transition:persist="site-header">
+    <header class="site-header">
       <div class="path">
         <a href="/" class="brand">made by sam</a>
         {breadcrumb.map((c, i) => (
@@ -181,11 +181,13 @@ const resolvedOgImage = new URL(ogImage ?? '/og-default.png', Astro.site).href;
   .crumb {
     color: inherit;
     text-decoration: none;
+    text-transform: lowercase;
     opacity: 0.65;
-    transition: opacity var(--transition);
+    transition: opacity var(--transition), color var(--transition);
   }
   .crumb:hover { opacity: 1; }
   .crumb--current {
+    color: var(--color-accent);
     opacity: 1;
     cursor: default;
   }

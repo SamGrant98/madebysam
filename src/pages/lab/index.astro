@@ -274,10 +274,22 @@ const driftData = {
     box-shadow:
       0 0 0 5px var(--color-bg),
       0 0 18px var(--color-bg);
-    transition: transform var(--transition), background var(--transition);
+    transition: transform var(--transition), background var(--transition), box-shadow var(--transition);
+  }
+  /* Live demos get the accent — visually distinguishes "shipped + clickable
+     to live" from "still cooking" without needing an extra label. */
+  .node--live .node__dot {
+    background: var(--color-accent);
+    box-shadow:
+      0 0 0 5px var(--color-bg),
+      0 0 18px var(--color-bg),
+      0 0 22px color-mix(in oklab, var(--color-accent) 35%, transparent);
   }
   .node:hover .node__dot {
     transform: scale(1.4);
+  }
+  .node--sketching:hover .node__dot,
+  .node--parked:hover .node__dot {
     background: var(--color-accent);
   }
 

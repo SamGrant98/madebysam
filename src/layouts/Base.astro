@@ -192,6 +192,17 @@ const resolvedOgImage = new URL(ogImage ?? '/og-default.png', Astro.site).href;
     cursor: default;
   }
 
+  /* On narrow viewports the right-side nav (about / lab / theme toggle)
+     can't share the bar with a 3-segment breadcrumb. Hide intermediate
+     crumbs so we still show "made by sam / current". Uses :has() so the
+     separator immediately before a hidden crumb is also dropped. */
+  @media (max-width: 640px) {
+    .path > .sep:has(+ .crumb:not(.crumb--current)),
+    .path > .crumb:not(.crumb--current) {
+      display: none;
+    }
+  }
+
   nav {
     display: flex;
     align-items: center;

@@ -39,11 +39,22 @@
 </style>
 
 <script>
-  const btn = document.getElementById('theme-toggle');
-  btn?.addEventListener('click', () => {
-    const current = document.documentElement.getAttribute('data-theme');
-    const next = current === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
-  });
+  // Bind on every page-load so the handler re-attaches after ClientRouter
+  // swaps. Without this, the button on subsequent pages had no click
+  // handler and the theme felt "stuck" — clicks did nothing.
+  function bindThemeToggle() {
+    const btn = document.getElementById('theme-toggle') as
+      | (HTMLButtonElement & { dataset: { bound?: string } })
+      | null;
+    if (!btn || btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+    });
+  }
+  document.addEventListener('astro:page-load', bindThemeToggle);
+  bindThemeToggle();
 </script>

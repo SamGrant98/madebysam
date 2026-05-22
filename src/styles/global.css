@@ -114,12 +114,13 @@ pre {
   color: var(--color-bg);
 }
 
-/* Touch devices: kill page scroll + native gestures so the canvas owns the
-   touch input. Without this, dragging on the topo just scrolls the page
-   instead of moving the contour peak. */
+/* Touch scroll-lock — only opt-in pages (currently none) get it. Was
+   global on all touch devices, but that broke long pages (case studies,
+   /about as it grows). Pages that genuinely need to capture every touch
+   for the canvas can add `data-scroll-lock` to <body>. */
 @media (pointer: coarse) {
-  html,
-  body {
+  html:has(body[data-scroll-lock]),
+  body[data-scroll-lock] {
     overflow: hidden;
     overscroll-behavior: none;
     touch-action: none;

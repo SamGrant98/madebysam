@@ -31,7 +31,7 @@ drift:
 
 ## What it is
 
-A 3D digital shelf visualiser for your physical media collection. Upload a CSV (or use the demo collection) and your DVDs stack the way a real shelf would — spines forward, titles auto-fit in Georgia. Scroll the tower, click a DVD to focus on it, flip it to read your notes, search and filter the collection, see stats about what you own.
+A 3D shelf visualiser for your physical media collection. Upload your collection as a CSV and your DVDs stack into a browsable tower, spines forward, just like a real shelf. Scroll through, click to focus, flip to read your notes, search and filter by what you own.
 
 ## Why I built it
 

@@ -13,9 +13,22 @@ import Base from '../layouts/Base.astro';
       <h2>What I do</h2>
       <p>
         I design and develop across a broad range of disciplines: websites, mobile apps, VR experiences, web AR, historic and cultural exhibitions, and interactive installations. My work spans concept and prototyping through to deployment.
-        Currently part of the creative technology team at SeymourPowell, a design and innovation consultancy in London. 
-        The <a href="/lab" class="underline">lab is where I build independently, personal projects and experiments outside of client work.
       </p>
+      <p>
+        Currently part of the creative technology team at SeymourPowell, a design and innovation consultancy in London. The <a href="/lab" class="underline">/lab</a> is where I build independently, personal projects and experiments outside of client work.
+      </p>
+    </section>
+
+    <section>
+      <h2>Stack</h2>
+      <div class="stack" aria-label="Stack">
+        <span class="chip">JavaScript</span>
+        <span class="chip">TypeScript</span>
+        <span class="chip">Three.js</span>
+        <span class="chip">Unity (C#)</span>
+        <span class="chip">Meta Quest</span>
+        <span class="chip">Web AR</span>
+      </div>
     </section>
 
     <section>
@@ -58,5 +71,18 @@ import Base from '../layouts/Base.astro';
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
+  }
+  .stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chip {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border: 1px solid color-mix(in oklab, var(--color-accent) 40%, transparent);
+    border-radius: 999px;
+    color: var(--color-accent);
+    opacity: 0.9;
   }
 </style>

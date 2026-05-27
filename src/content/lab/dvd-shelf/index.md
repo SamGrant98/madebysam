@@ -31,14 +31,8 @@ drift:
 
 ## What it is
 
-A 3D shelf renderer for your physical media collection. Upload a CSV (or use the demo collection) and your DVDs stack the way a real shelf would — spines forward, titles auto-fit in Georgia. Scroll the tower, click a DVD to focus on it, flip it to read your notes, search and filter the collection, see stats about what you own.
-
-## How it works
-
-Plain Three.js + an importmap, no build step. Each DVD is a textured box; spines are generated as canvas textures with the title auto-fit to width. Posters and backdrops come from TMDB via a serverless Vercel proxy so the API key never leaves the server. User-uploaded collections persist in IndexedDB so they survive reloads.
-
-The atmospheric backdrop behind a focused DVD is a procedural radial gradient driven by the focused DVD's average colour — so every title sits in its own light.
+A 3D digital shelf visualiser for your physical media collection. Upload a CSV (or use the demo collection) and your DVDs stack the way a real shelf would — spines forward, titles auto-fit in Georgia. Scroll the tower, click a DVD to focus on it, flip it to read your notes, search and filter the collection, see stats about what you own.
 
 ## Why I built it
 
-_[Your why — the moment / the itch / the question the demo answers]_
+When building up my DVD and physical media collection, I wanted a way to browse what I owned whilst away from home. I looked at apps like Letterboxd to track my collection but found myself wanting more of an experience.

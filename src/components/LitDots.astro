@@ -91,8 +91,11 @@
 
     function resize() {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
-      w = innerWidth;
-      h = innerHeight;
+      // clientWidth/Height, not innerWidth/Height: those include the
+      // scrollbar (17px on Windows), which stretched the canvas and pushed
+      // the lit dots off the grid towards the right edge.
+      w = document.documentElement.clientWidth;
+      h = document.documentElement.clientHeight;
       canvas!.width = Math.round(w * dpr);
       canvas!.height = Math.round(h * dpr);
       kick();
@@ -193,6 +196,9 @@
     });
     addEventListener('scroll', () => { if (level > 0.01) kick(); }, { passive: true });
     addEventListener('resize', resize);
+    // A scrollbar appearing or disappearing changes the width without a
+    // window resize (e.g. navigating from a short page to a long one).
+    new ResizeObserver(resize).observe(document.documentElement);
 
     // New page, or theme switched: pick up the new colours and floods.
     document.addEventListener('astro:page-load', refresh);

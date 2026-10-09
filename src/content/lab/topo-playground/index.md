@@ -2,7 +2,7 @@
 title: Topo Playground
 blurb: Same shader as this background, with knobs.
 status: sketching
-category: generative
+category: play
 stack:
   - OGL
   - GLSL

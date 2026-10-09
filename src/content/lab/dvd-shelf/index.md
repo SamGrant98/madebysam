@@ -2,7 +2,7 @@
 title: DVD Shelf
 blurb: A 3D shelf for your physical media. Drop in a CSV, browse in space.
 status: live
-category: three-d
+category: play
 href: https://dvd.madebysam.dev
 stack:
   - Three.js

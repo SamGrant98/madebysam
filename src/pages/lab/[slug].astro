@@ -2,6 +2,7 @@
 import { getCollection, render } from 'astro:content';
 import { Image, getImage } from 'astro:assets';
 import Base from '../../layouts/Base.astro';
+import { CATEGORIES } from '../../lib/categories';
 
 export async function getStaticPaths() {
   const entries = await getCollection('lab');
@@ -23,13 +24,6 @@ const ogImage = data.screenshot
   ? (await getImage({ src: data.screenshot, format: 'png', width: 1200, height: 630, fit: 'cover' })).src
   : undefined;
 
-const categoryLabels = {
-  'three-d': '3D',
-  'generative': 'Generative',
-  'data': 'Data',
-  'audio': 'Audio',
-  'tools': 'Tools',
-} as const;
 ---
 
 <Base
@@ -46,7 +40,7 @@ const categoryLabels = {
       <h1>{data.title}</h1>
       <p class="lede">{data.blurb}</p>
       <div class="demo__meta">
-        <span class="meta-item">{categoryLabels[data.category]}</span>
+        <span class="meta-item">{CATEGORIES[data.category].label}</span>
         <span class={`meta-item status status--${data.status}`}>{data.status}</span>
       </div>
     </header>

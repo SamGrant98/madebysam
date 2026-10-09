@@ -1,5 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
+import { CATEGORIES } from '../../lib/categories';
 import { getCollection } from 'astro:content';
 
 // Pull lab entries from the content collection. Each entry's frontmatter
@@ -10,13 +11,6 @@ const labEntries = (await getCollection('lab')).sort(
   (a, b) => a.data.order - b.data.order,
 );
 
-const categoryLabels = {
-  'three-d': '3D',
-  'generative': 'Generative',
-  'data': 'Data',
-  'audio': 'Audio',
-  'tools': 'Tools',
-} as const;
 
 // Pre-compute initial edge coords (in viewBox 0..100 units = percent of viewport).
 // Connections are still defined here since they aren't a per-demo property.
@@ -87,7 +81,7 @@ const driftData = {
           <div class="node__label">
             <span class="node__title">{data.title}</span>
             <span class="node__meta">
-              <span>{categoryLabels[data.category]}</span>
+              <span>{CATEGORIES[data.category].label}</span>
               {data.status !== 'live' && <span class="node__status">{data.status}</span>}
             </span>
           </div>

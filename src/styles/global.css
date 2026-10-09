@@ -1,13 +1,54 @@
+@import './fonts.css';
+
+/* ------------------------------------------------------------------
+   Brand tokens v1.3 (source of truth: Obsidian Work/Brand/tokens.css)
+   Light is the site default here, so :root holds the paper values
+   and [data-theme='dark'] switches to ink.
+   ------------------------------------------------------------------ */
 :root {
-  --color-bg: #fafafa;
-  --color-fg: #0a0a0a;
-  --color-muted: #666666;
-  --color-accent: #ff6b35;
-  --font-sans:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
-    Cantarell, 'Helvetica Neue', sans-serif;
-  --font-mono:
-    ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --ink: #0D0D0F;
+  --paper: #F3F2EE;
+
+  /* signal: same on ink and paper (dots, fills, tags, floods, logo) */
+  --orange: #FF6601; /* Dundee United */
+  --cat-sound: #A274FF;
+  --cat-movement: #00A456;
+  --cat-space: #3CC8FF;
+  --cat-play: #FFD619;
+
+  /* text: deep versions on paper, only for small coloured text */
+  --orange-text: #A43E00;
+  --cat-sound-text: #713DC5;
+  --cat-movement-text: #00773D;
+  --cat-space-text: #006D90;
+  --cat-play-text: #766200;
+
+  /* type */
+  --font-display: 'Switzer', 'Helvetica Neue', Arial, sans-serif;
+  --font-body: 'Switzer', 'Helvetica Neue', Arial, sans-serif;
+  --font-accent: 'Melodrama', Georgia, serif;
+  --font-mono: 'Martian Mono', ui-monospace, Menlo, Consolas, monospace;
+  --display-weight: 900;
+  --display-tracking: -0.04em;
+  --accent-weight: 400;
+  --accent-scale: 1.15; /* relative to surrounding Switzer */
+
+  /* grid */
+  --space-unit: 8px;
+  --dot-spacing: 24px;
+  --dot-size: 1.5px;
+
+  /* flood: one full-bleed hero per page, everything on it is ink */
+  --flood-fg: var(--ink);
+  --flood-mark-opacity: 0.2;
+
+  /* legacy names, kept as aliases while components migrate */
+  --color-bg: var(--paper);
+  --color-fg: var(--ink);
+  --color-muted: #5C5B57;
+  --color-accent: var(--orange); /* legacy: old pages only, remove once they're rebuilt */
+  --font-sans: var(--font-body);
+
   --space-1: 0.5rem;
   --space-2: 1rem;
   --space-3: 1.5rem;
@@ -19,10 +60,16 @@
 }
 
 :root[data-theme='dark'] {
-  --color-bg: #0a0a0a;
-  --color-fg: #fafafa;
-  --color-muted: #888888;
-  /* accent stays the same hue across themes — orange reads on both */
+  --color-bg: var(--ink);
+  --color-fg: var(--paper);
+  --color-muted: #9C9B97;
+
+  /* on ink, text uses the signal colour directly */
+  --orange-text: var(--orange);
+  --cat-sound-text: var(--cat-sound);
+  --cat-movement-text: var(--cat-movement);
+  --cat-space-text: var(--cat-space);
+  --cat-play-text: var(--cat-play);
 }
 
 *,
@@ -78,12 +125,12 @@ a.underline::after {
 
 a.underline:hover::after {
   transform: scaleX(1);
-  background: var(--color-accent);
+  background: var(--orange); /* a shape, so signal orange */
 }
 
-/* Accessible focus ring uses the accent so keyboard nav is obvious */
+/* Accessible focus ring uses brand orange so keyboard nav is obvious */
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--orange);
   outline-offset: 3px;
   border-radius: 2px;
 }
@@ -110,8 +157,8 @@ pre {
 }
 
 ::selection {
-  background: var(--color-accent);
-  color: var(--color-bg);
+  background: var(--orange);
+  color: var(--ink); /* text on an orange fill is always ink */
 }
 
 /* Touch scroll-lock — only opt-in pages (currently none) get it. Was

@@ -1,8 +1,8 @@
 ---
 title: Audio Reactive
-blurb: Mic input drives a shader — volume, frequency, beat.
+blurb: 'Mic input drives a shader: volume, frequency, beat.'
 status: sketching
-category: audio
+category: sound
 order: 4
 mapPosition:
   x: 0.36

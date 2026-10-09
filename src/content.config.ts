@@ -1,5 +1,6 @@
 import { defineCollection, z } from 'astro:content';
 import { glob } from 'astro/loaders';
+import { CATEGORY_KEYS } from './lib/categories';
 
 // Lab collection — each demo lives in its own folder under src/content/lab/.
 // The folder holds:
@@ -24,7 +25,17 @@ const lab = defineCollection({
       title: z.string(),
       blurb: z.string(),
       status: z.enum(['live', 'sketching', 'parked']),
-      category: z.enum(['three-d', 'generative', 'data', 'audio', 'tools']),
+      // Brand categories. Chosen by what the project is FOR, not what it's
+      // built with (see BRAND.md). Labels, glyphs and colours live in
+      // src/lib/categories.ts.
+      category: z.enum(CATEGORY_KEYS),
+      // New for the instrument-style project page. All optional so entries
+      // can be filled in gradually.
+      year: z.number().int().optional(),
+      role: z.string().optional(),
+      demo: z.string().url().optional(), // embed URL or video for the "play it" block
+      repo: z.string().url().optional(),
+      next: z.string().optional(), // what's next / what I learned
       href: z.string().url().optional(),
       stack: z.array(z.string()).default([]),
       inspiration: z.string().optional(),

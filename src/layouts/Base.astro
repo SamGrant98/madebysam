@@ -45,6 +45,9 @@ const resolvedOgImage = new URL(ogImage ?? '/og-default.png', Astro.site).href;
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalUrl} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    {/* Preload the two Switzer weights used above the fold */}
+    <link rel="preload" href="/fonts/switzer/Switzer-Regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/switzer/Switzer-Black.woff2" as="font" type="font/woff2" crossorigin />
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
 
@@ -187,7 +190,7 @@ const resolvedOgImage = new URL(ogImage ?? '/og-default.png', Astro.site).href;
   }
   .crumb:hover { opacity: 1; }
   .crumb--current {
-    color: var(--color-accent);
+    color: var(--orange-text); /* small text, so the -text token */
     opacity: 1;
     cursor: default;
   }

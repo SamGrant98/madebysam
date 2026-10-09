@@ -1,0 +1,54 @@
+---
+// One mark from the brand's glyph set: dot (brand), bar (sound),
+// chevron (movement), plus (space), square (play).
+//
+// All shapes are drawn once, inside a 24×24 box that matches one cell of
+// the 24px dot grid. Two variants reuse that same geometry:
+//   grid  – the whole 24×24 cell, so the mark sits at true dot-grid scale
+//   icon  – the viewBox zooms into the middle 8×8, so the same shape fills
+//           the box (for tags, list markers, lab nodes)
+//
+// Colour comes from currentColor, so the parent decides it, e.g.
+//   <span style={`color: ${CATEGORIES.sound.color}`}><Glyph kind="bar" /></span>
+import type { GlyphKind } from '../lib/categories';
+
+interface Props {
+  kind: GlyphKind;
+  variant?: 'grid' | 'icon';
+  /** Rendered size in px (width and height). */
+  size?: number;
+  /** Give a label only when the glyph is the only thing saying the category. */
+  label?: string;
+  class?: string;
+}
+
+const { kind, variant = 'icon', size = 16, label, class: className } = Astro.props;
+const viewBox = variant === 'icon' ? '8 8 8 8' : '0 0 24 24';
+---
+
+<svg
+  class:list={['glyph', className]}
+  viewBox={viewBox}
+  width={size}
+  height={size}
+  role={label ? 'img' : undefined}
+  aria-label={label}
+  aria-hidden={label ? undefined : 'true'}
+  focusable="false"
+>
+  {kind === 'dot' && <circle cx="12" cy="12" r="1.5" fill="currentColor" />}
+  {kind === 'bar' && <rect x="11.1" y="8.5" width="1.8" height="7" fill="currentColor" />}
+  {kind === 'chevron' && (
+    <path d="M10.5 9 L13.5 12 L10.5 15" fill="none" stroke="currentColor" stroke-width="1.6" />
+  )}
+  {kind === 'plus' && <path d="M9 12 H15 M12 9 V15" fill="none" stroke="currentColor" stroke-width="1.6" />}
+  {kind === 'square' && <rect x="9.9" y="9.9" width="4.2" height="4.2" fill="currentColor" />}
+</svg>
+
+<style>
+  .glyph {
+    display: inline-block;
+    flex: none;
+    vertical-align: middle;
+  }
+</style>

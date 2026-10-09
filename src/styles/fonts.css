@@ -1,0 +1,14 @@
+/* Brand fonts, self-hosted from /public/fonts.
+   Switzer + Melodrama: Fontshare ITF Free Font License (commercial + web OK,
+   files must stay unmodified). Martian Mono: SIL OFL (via @fontsource). */
+
+@font-face { font-family: 'Switzer'; src: url('/fonts/switzer/Switzer-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Switzer'; src: url('/fonts/switzer/Switzer-Italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Switzer'; src: url('/fonts/switzer/Switzer-Medium.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Switzer'; src: url('/fonts/switzer/Switzer-Bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Switzer'; src: url('/fonts/switzer/Switzer-Black.woff2') format('woff2'); font-weight: 900; font-style: normal; font-display: swap; }
+
+@font-face { font-family: 'Melodrama'; src: url('/fonts/melodrama/Melodrama-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+
+@font-face { font-family: 'Martian Mono'; src: url('/fonts/martian-mono/martian-mono-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Martian Mono'; src: url('/fonts/martian-mono/martian-mono-latin-500-normal.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }

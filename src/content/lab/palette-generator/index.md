@@ -2,7 +2,7 @@
 title: Palette Generator
 blurb: Throw a photo at it, get a colour system out.
 status: sketching
-category: tools
+category: play
 order: 3
 mapPosition:
   x: 0.78

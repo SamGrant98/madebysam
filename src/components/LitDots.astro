@@ -1,11 +1,13 @@
 ---
-// The "lit" layer: dots on the page grid light up orange near a light
-// source, like an LED matrix behind the paper.
+// The "lit" layer: marks on the page grid light up near a light source,
+// like an LED matrix behind the paper.
 //
-// One fixed canvas behind <main>. It only draws the lit dots (the resting
-// dots are the body background), at page multiples of 24px, so they sit
-// exactly on top of the background dots. Anything with its own background
-// (floods, cards, images) covers it, so the light lives in the paper.
+// Two places get lit:
+//   paper   one fixed canvas behind <main>: dots light up in the page
+//           colour (--page-accent: orange, or the project's category)
+//   floods  each FloodHero has its own canvas (data-lit-glyph): its glyphs
+//           light up in the text colour, black in light mode, white in dark
+// Everything sits on page multiples of 24px, exactly over the resting marks.
 //
 // The light follows:
 //   cursor  on mouse / trackpad
@@ -35,7 +37,27 @@
   const GRID = 24;
   const RADIUS = 144; // px: how far the light reaches (6 cells)
   const EASE = 0.18; // how quickly the light catches up with its target
-  const ORANGE = '255, 102, 1';
+
+  type Flood = { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; kind: string };
+
+  // The glyphs, drawn in their 24x24 cell, centred on (x, y), scaled by s.
+  // Same geometry as Glyph.astro.
+  function glyph(c: CanvasRenderingContext2D, kind: string, x: number, y: number, s: number) {
+    c.save();
+    c.translate(x, y);
+    c.scale(s, s);
+    c.translate(-12, -12);
+    c.lineWidth = 1.6;
+    c.beginPath();
+    if (kind === 'bar') c.rect(11.1, 8.5, 1.8, 7);
+    else if (kind === 'square') c.rect(9.9, 9.9, 4.2, 4.2);
+    else if (kind === 'chevron') { c.moveTo(10.5, 9); c.lineTo(13.5, 12); c.lineTo(10.5, 15); }
+    else if (kind === 'plus') { c.moveTo(9, 12); c.lineTo(15, 12); c.moveTo(12, 9); c.lineTo(12, 15); }
+    else c.arc(12, 12, 1.5, 0, Math.PI * 2);
+    if (kind === 'chevron' || kind === 'plus') c.stroke();
+    else c.fill();
+    c.restore();
+  }
 
   const canvas = document.querySelector<HTMLCanvasElement>('canvas.lit');
   if (canvas && !canvas.dataset.ready) {
@@ -44,13 +66,28 @@
     const reduce = reducedMotion();
 
     let w = 0, h = 0, dpr = 1;
-    // Where the light is, where it's heading, and how bright it is (0..1).
     const light = { x: -999, y: -999 };
     const target = { x: -999, y: -999 };
     let level = 0, targetLevel = 0;
     let raf = 0;
     let fadeTimer = 0;
     let tilting = false;
+
+    // Per-page state, refreshed on every navigation and theme change.
+    let accent = '#ff6601';
+    let fg = '#0d0d0f';
+    let floods: Flood[] = [];
+    function refresh() {
+      const cs = getComputedStyle(document.documentElement);
+      accent = cs.getPropertyValue('--page-accent').trim() || accent;
+      fg = cs.getPropertyValue('--color-fg').trim() || fg;
+      floods = [...document.querySelectorAll<HTMLCanvasElement>('canvas[data-lit-glyph]')].map((c) => ({
+        canvas: c,
+        ctx: c.getContext('2d')!,
+        kind: c.dataset.litGlyph || 'dot',
+      }));
+      kick();
+    }
 
     function resize() {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -61,26 +98,54 @@
       kick();
     }
 
-    function draw() {
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, w, h);
-      if (level < 0.01) return;
-
-      // Only the dots inside the light's reach. Dot centres are at page
-      // multiples of GRID, so on screen they're offset by the scroll.
-      const sy = scrollY;
-      const x0 = Math.ceil((light.x - RADIUS) / GRID) * GRID;
+    // Visit every grid point within the light's reach. Points are at PAGE
+    // multiples of GRID, so on screen they're offset by the scroll.
+    function eachLitPoint(fn: (x: number, y: number, k: number) => void) {
+      const sx = scrollX, sy = scrollY;
+      const x0 = Math.ceil((light.x + sx - RADIUS) / GRID) * GRID - sx;
       const y0 = Math.ceil((light.y + sy - RADIUS) / GRID) * GRID - sy;
       for (let y = y0; y <= light.y + RADIUS; y += GRID) {
         for (let x = x0; x <= light.x + RADIUS; x += GRID) {
           const d = Math.hypot(x - light.x, y - light.y) / RADIUS;
-          if (d >= 1) continue;
-          const k = (1 - d * d * (3 - 2 * d)) * level; // smoothstep falloff
-          ctx.fillStyle = `rgba(${ORANGE}, ${k})`;
-          ctx.beginPath();
-          ctx.arc(x, y, 1.5 + 2 * k, 0, Math.PI * 2);
-          ctx.fill();
+          if (d < 1) fn(x, y, (1 - d * d * (3 - 2 * d)) * level); // smoothstep falloff
         }
+      }
+    }
+
+    function drawPaper() {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      if (level < 0.01) return;
+      ctx.fillStyle = accent;
+      eachLitPoint((x, y, k) => {
+        ctx.globalAlpha = k;
+        ctx.beginPath();
+        ctx.arc(x, y, 1.5 + 2 * k, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+    }
+
+    function drawFloods() {
+      for (const f of floods) {
+        if (!f.canvas.isConnected) continue;
+        const r = f.canvas.getBoundingClientRect();
+        const cw = Math.round(r.width * dpr), ch = Math.round(r.height * dpr);
+        if (f.canvas.width !== cw || f.canvas.height !== ch) { f.canvas.width = cw; f.canvas.height = ch; }
+        const c = f.ctx;
+        c.setTransform(dpr, 0, 0, dpr, 0, 0);
+        c.clearRect(0, 0, r.width, r.height);
+        // Skip floods the light can't reach (most of the time, all of them).
+        if (level < 0.01 || light.x < r.left - RADIUS || light.x > r.right + RADIUS ||
+            light.y < r.top - RADIUS || light.y > r.bottom + RADIUS) continue;
+        c.fillStyle = fg;
+        c.strokeStyle = fg;
+        const grow = f.kind === 'dot' ? 1.2 : 0.5;
+        eachLitPoint((x, y, k) => {
+          c.globalAlpha = k;
+          glyph(c, f.kind, x - r.left, y - r.top, 1 + grow * k);
+        });
+        c.globalAlpha = 1;
       }
     }
 
@@ -91,7 +156,8 @@
       light.x += (target.x - light.x) * t;
       light.y += (target.y - light.y) * t;
       level += (targetLevel - level) * (reduce ? 1 : 0.12);
-      draw();
+      drawPaper();
+      drawFloods();
       const moving =
         Math.abs(target.x - light.x) > 0.5 ||
         Math.abs(target.y - light.y) > 0.5 ||
@@ -128,6 +194,13 @@
     addEventListener('scroll', () => { if (level > 0.01) kick(); }, { passive: true });
     addEventListener('resize', resize);
 
+    // New page, or theme switched: pick up the new colours and floods.
+    document.addEventListener('astro:page-load', refresh);
+    new MutationObserver(refresh).observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme', 'data-accent'],
+    });
+
     // ---- Tilt (phones) ----
     // beta: front/back tilt (about 45deg when holding a phone), gamma: left/right.
     function onTilt(e: DeviceOrientationEvent) {
@@ -157,5 +230,6 @@
     }
 
     resize();
+    refresh();
   }
 </script>

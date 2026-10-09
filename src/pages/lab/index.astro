@@ -12,7 +12,6 @@ import { getCollection } from 'astro:content';
 import Base from '../../layouts/Base.astro';
 import Glyph from '../../components/Glyph.astro';
 import ProjectCard from '../../components/ProjectCard.astro';
-import SiteFooter from '../../components/SiteFooter.astro';
 import { CATEGORIES } from '../../lib/categories';
 
 const entries = (await getCollection('lab')).sort((a, b) => a.data.order - b.data.order);
@@ -110,7 +109,6 @@ const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
     </section>
   </div>
 
-  <SiteFooter />
 </Base>
 
 <script>
@@ -341,6 +339,34 @@ const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
     background: var(--color-fg);
     color: var(--color-bg);
     opacity: 1;
+  }
+
+  /* Desktop, map view: intro and map fill exactly one screen, no scroll.
+     The intro becomes one row (title left, line + toggle right) and the
+     map takes whatever height is left. List view scrolls as normal. */
+  @media (min-width: 1025px) {
+    .intro {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: end;
+      gap: calc(var(--grid) / 2) calc(var(--grid) * 4);
+      padding-top: calc(var(--header-h) + var(--grid));
+      padding-bottom: var(--grid);
+    }
+    .intro__title {
+      grid-row: span 2;
+      font-size: clamp(4rem, 7vw, 6rem);
+    }
+    .lab[data-view='map'] {
+      height: 100svh;
+      display: flex;
+      flex-direction: column;
+    }
+    .lab[data-view='map'] .map {
+      flex: 1 1 auto;
+      min-height: 0;
+      height: auto;
+    }
   }
 
   /* Only one view at a time. */

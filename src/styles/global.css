@@ -252,9 +252,19 @@ pre {
   font-family: var(--font-mono);
 }
 
+/* Page colour: brand orange, or the category on project pages (set by
+   Base via <html data-accent>). Used for text selection and the lit dots. */
+:root {
+  --page-accent: var(--orange);
+}
+html[data-accent='sound'] { --page-accent: var(--cat-sound); }
+html[data-accent='movement'] { --page-accent: var(--cat-movement); }
+html[data-accent='space'] { --page-accent: var(--cat-space); }
+html[data-accent='play'] { --page-accent: var(--cat-play); }
+
 ::selection {
-  background: var(--orange);
-  color: var(--ink); /* text on an orange fill is always ink */
+  background: var(--page-accent);
+  color: var(--ink); /* every signal colour takes ink text */
 }
 
 /* Touch scroll-lock — only opt-in pages (currently none) get it. Was

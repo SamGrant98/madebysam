@@ -1,15 +1,19 @@
 ---
-// Home: say hello, then show the work.
-// Sections with data-path feed the header's path as you scroll
-// (made by sam / now, made by sam / selected, …).
+// Home: straight into the work.
+//   hero      orange flood + Sam's dot portrait sitting across its bottom
+//             edge (half on the orange, half on the page). Hovering pushes
+//             the dots around; clicking goes to /about.
+//   selected  the first four lab projects
+//   instruments  the four categories and a way into the lab
+// Sections with data-path feed the header's path as you scroll.
 import { getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
 import FloodHero from '../components/FloodHero.astro';
+import DotPortrait from '../components/DotPortrait.astro';
 import ProjectCard from '../components/ProjectCard.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import Glyph from '../components/Glyph.astro';
 import { CATEGORIES, CATEGORY_KEYS } from '../lib/categories';
-import { site } from '../data/site';
 
 // Same ordering as the lab (frontmatter `order`), first four.
 const selected = (await getCollection('lab'))
@@ -18,26 +22,17 @@ const selected = (await getCollection('lab'))
 ---
 
 <Base title="made by sam">
-  <FloodHero tone="brand" marks="dots">
-    <span slot="eyebrow" class="home-eyebrow">Sam Grant</span>
-    <h1 class="display home-h1">
-      I enjoy <span class="accent">making</span> things. Hope you enjoy them too.
-    </h1>
-  </FloodHero>
-
-  <section class="intro">
-    <p class="intro__lede">
-      Creative technologist based in the UK. I work across the web, XR, and immersive
-      experiences, and I'm always building something in the
-      <a href="/lab" class="underline">/lab</a>.
-    </p>
-    {site.now && (
-      <div class="now" data-path="now">
-        <span class="label now__label">Now</span>
-        <p class="now__text">{site.now}</p>
-      </div>
-    )}
-  </section>
+  <div class="hero">
+    <FloodHero tone="brand" marks="dots" class="hero__flood">
+      <span slot="eyebrow" class="home-eyebrow">Sam Grant</span>
+      <h1 class="display home-h1">
+        I enjoy <span class="accent">making</span> things. Hope you enjoy them too.
+      </h1>
+    </FloodHero>
+    <div class="hero__portrait">
+      <DotPortrait href="/about" controls={false} split />
+    </div>
+  </div>
 
   <section class="selected" data-path="selected">
     <div class="section-head">
@@ -81,37 +76,39 @@ const selected = (await getCollection('lab'))
     max-width: 13ch;
   }
 
-  .intro {
-    padding: calc(var(--grid) * 2) var(--page-margin);
-    border-bottom: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--grid) calc(var(--grid) * 3);
-    align-items: baseline;
+  /* ---- Hero + portrait ----
+     --portrait is the portrait's width. It overlaps the flood by 60% of
+     its height and hangs 40% below it, onto the page. */
+  .hero {
+    --portrait: min(calc(100vw - var(--page-margin) * 2), calc(var(--grid) * 14));
   }
-  .intro__lede {
-    flex: 999 1 30rem;
-    margin: 0;
-    font-size: clamp(1.25rem, 2.2vw, 1.875rem);
-    line-height: 1.35;
-    max-width: 34ch;
+  .hero__portrait {
+    position: relative;
+    z-index: 2; /* above the flood */
+    width: var(--portrait);
+    margin: calc(var(--portrait) * -0.6) auto 0;
   }
-  .now {
-    flex: 1 1 18rem;
-    display: flex;
-    flex-direction: column;
-    gap: calc(var(--grid) / 3);
+  /* Phones and tablets: the portrait is centred under the heading, so the
+     flood gets extra room at the bottom for it. */
+  .hero :global(.hero__flood .flood__content) {
+    padding-bottom: calc(var(--grid) * 3 + var(--portrait) * 0.6);
   }
-  .now__label {
-    text-transform: uppercase;
-    opacity: 0.6;
-  }
-  .now__text {
-    margin: 0;
+  /* Desktop: portrait on the right, heading keeps clear of it. */
+  @media (min-width: 1025px) {
+    .hero {
+      --portrait: clamp(calc(var(--grid) * 16), 34vw, calc(var(--grid) * 22));
+    }
+    .hero__portrait {
+      margin-right: var(--page-margin);
+    }
+    .hero :global(.hero__flood .flood__content) {
+      padding-bottom: calc(var(--grid) * 3);
+      max-width: calc(100% - var(--portrait) - var(--grid) * 2);
+    }
   }
 
   .selected {
-    padding: calc(var(--grid) * 3) var(--page-margin) calc(var(--grid) * 4);
+    padding: calc(var(--grid) * 2) var(--page-margin) calc(var(--grid) * 4);
     display: flex;
     flex-direction: column;
     gap: calc(var(--grid) * 2);

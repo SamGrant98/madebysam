@@ -1,9 +1,9 @@
 ---
-// The about-page portrait, drawn on the dot grid.
+// Sam's portrait, drawn on the dot grid.
 //
 // The photo is pre-processed by scripts/portrait.py into a tiny 128x128
 // "portrait map" (public/portrait/sam.png): grey = brightness, alpha = the
-// person. This component samples that map once per dot and draws:
+// person. This component samples it once per dot and draws:
 //
 //   dots   halftone on the 12px half grid (every other dot is a page dot)
 //   big    halftone on the full 24px grid
@@ -11,67 +11,100 @@
 //
 // Light theme: ink dots, bigger where the photo is darker.
 // Dark theme: paper dots, bigger where the photo is lighter.
-// The cursor (or a tap) lights the dots near it orange: the first piece
-// of the site-wide "lit dots" idea.
+//
+// Hover / touch: the dots near the pointer get pushed away and light up in
+// the page colour, then spring back when it leaves.
+//
+// Props:
+//   href      make the portrait a link (home: to /about)
+//   controls  show the dots / big / ascii toggle (default true)
+//   split     the portrait sits across the bottom edge of the page's flood:
+//             dots over the flood draw in ink, dots below in the page colours
 interface Props {
   src?: string;
   alt?: string;
+  href?: string;
+  controls?: boolean;
+  split?: boolean;
 }
-const { src = '/portrait/sam.png', alt = 'Portrait of Sam, drawn in dots' } = Astro.props;
+const {
+  src = '/portrait/sam.png',
+  alt = 'Portrait of Sam, drawn in dots',
+  href,
+  controls = true,
+  split = false,
+} = Astro.props;
+const Stage = href ? 'a' : 'div';
 ---
 
-<figure class="portrait" data-portrait data-src={src}>
-  <div class="portrait__stage">
+<figure class="portrait" data-portrait data-src={src} data-split={split ? '' : undefined}>
+  <Stage class="portrait__stage" href={href} aria-label={href ? 'About Sam' : undefined}>
     <canvas role="img" aria-label={alt}></canvas>
-  </div>
-  <div class="portrait__modes" role="group" aria-label="Portrait style">
-    <button type="button" class="label" data-mode="dots" aria-pressed="true">dots</button>
-    <button type="button" class="label" data-mode="big" aria-pressed="false">big</button>
-    <button type="button" class="label" data-mode="ascii" aria-pressed="false">ascii</button>
-  </div>
+  </Stage>
+  {href && <span class="portrait__hint label" aria-hidden="true">about</span>}
+  {controls && (
+    <div class="portrait__modes" role="group" aria-label="Portrait style">
+      <button type="button" class="label" data-mode="dots" aria-pressed="true">dots</button>
+      <button type="button" class="label" data-mode="big" aria-pressed="false">big</button>
+      <button type="button" class="label" data-mode="ascii" aria-pressed="false">ascii</button>
+    </div>
+  )}
 </figure>
 
 <script>
+  import { reducedMotion } from '../lib/motion';
+
   type Mode = 'dots' | 'big' | 'ascii';
+  type PortraitMap = { data: Uint8ClampedArray; width: number; height: number };
   const PITCH: Record<Mode, number> = { dots: 12, big: 24, ascii: 12 };
   const RAMP = ' .:-=+*#%@'; // light to dark
-  const LIT_RADIUS = 96; // px around the pointer that light up
-  const ORANGE = [255, 102, 1];
+  const REACH = 110; // px around the pointer that react
+  const PUSH = 26; // px: how far dots get shoved at the pointer itself
 
-  let cleanup: (() => void) | null = null;
-
-  async function loadMap(src: string) {
-    const img = new Image();
-    img.src = src;
-    await img.decode();
-    const c = document.createElement('canvas');
-    c.width = img.naturalWidth;
-    c.height = img.naturalHeight;
-    const ctx = c.getContext('2d', { willReadFrequently: true })!;
-    ctx.drawImage(img, 0, 0);
-    const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
-    // data is RGBA; the PNG is grey+alpha so R = G = B = brightness.
-    return { data, width, height };
+  // Load each portrait map once, however many portraits use it.
+  const maps = new Map<string, Promise<PortraitMap>>();
+  function loadMap(src: string): Promise<PortraitMap> {
+    if (!maps.has(src)) {
+      maps.set(src, (async () => {
+        const img = new Image();
+        img.src = src;
+        await img.decode();
+        const c = document.createElement('canvas');
+        c.width = img.naturalWidth;
+        c.height = img.naturalHeight;
+        const ctx = c.getContext('2d', { willReadFrequently: true })!;
+        ctx.drawImage(img, 0, 0);
+        const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
+        return { data, width, height }; // grey+alpha PNG: R = G = B = brightness
+      })());
+    }
+    return maps.get(src)!;
   }
 
-  function init() {
-    cleanup?.();
-    cleanup = null;
-    const root = document.querySelector<HTMLElement>('[data-portrait]');
-    if (!root) return;
+  // '#rrggbb' or 'rgb(r, g, b)' -> [r, g, b]
+  function rgb(css: string): number[] {
+    const hex = css.trim().match(/^#([0-9a-f]{6})$/i);
+    if (hex) { const n = parseInt(hex[1], 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
+    const nums = css.match(/\d+(\.\d+)?/g);
+    return nums && nums.length >= 3 ? nums.slice(0, 3).map(Number) : [13, 13, 15];
+  }
+  const mix = (a: number[], b: number[], t: number) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+
+  function mount(root: HTMLElement): () => void {
     const canvas = root.querySelector('canvas')!;
     const ctx = canvas.getContext('2d')!;
     const buttons = root.querySelectorAll<HTMLButtonElement>('[data-mode]');
+    const split = root.hasAttribute('data-split');
     const ac = new AbortController();
     const { signal } = ac;
 
-    let map: Awaited<ReturnType<typeof loadMap>> | null = null;
+    let map: PortraitMap | null = null;
     let mode: Mode = 'dots';
-    let pointer: { x: number; y: number } | null = null;
     let w = 0, h = 0, dpr = 1;
     let raf = 0;
+    // The pointer, eased, and how strongly it's acting (0..1).
+    const p = { x: 0, y: 0, tx: 0, ty: 0, level: 0, target: 0 };
 
-    // Bilinear sample of the map at u,v (0..1). Returns [brightness, alpha], 0..1.
     function sample(u: number, v: number): [number, number] {
       const m = map!;
       const x = Math.min(Math.max(u * m.width - 0.5, 0), m.width - 1);
@@ -84,24 +117,6 @@ const { src = '/portrait/sam.png', alt = 'Portrait of Sam, drawn in dots' } = As
         at(x0, y0, ch) * (1 - fx) * (1 - fy) + at(x1, y0, ch) * fx * (1 - fy) +
         at(x0, y1, ch) * (1 - fx) * fy + at(x1, y1, ch) * fx * fy;
       return [lerp(0), lerp(3)];
-    }
-
-    // Theme: read the --color-fg token, so it follows the toggle and the
-    // system setting without knowing how the theme is chosen. (Not the
-    // element's `color`: body fades that over 0.2s, so it lags behind.)
-    function fgColour() {
-      const raw = getComputedStyle(root!).getPropertyValue('--color-fg').trim();
-      let r = 13, g = 13, b = 15;
-      const hex = raw.match(/^#([0-9a-f]{6})$/i);
-      if (hex) {
-        const n = parseInt(hex[1], 16);
-        r = n >> 16; g = (n >> 8) & 255; b = n & 255;
-      } else {
-        const nums = raw.match(/\d+(\.\d+)?/g);
-        if (nums && nums.length >= 3) [r, g, b] = nums.map(Number);
-      }
-      const dark = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.5; // light text = dark theme
-      return { rgb: [r, g, b], dark };
     }
 
     function resize() {
@@ -117,13 +132,25 @@ const { src = '/portrait/sam.png', alt = 'Portrait of Sam, drawn in dots' } = As
     function draw() {
       if (!map || !w) return;
       const pitch = PITCH[mode];
-      const { rgb, dark } = fgColour();
+      // Colours from the tokens (not `color`, which fades with the theme).
+      const cs = getComputedStyle(root);
+      const fg = rgb(cs.getPropertyValue('--color-fg'));
+      const accent = rgb(cs.getPropertyValue('--page-accent'));
+      const ink = rgb(cs.getPropertyValue('--flood-fg') || '#0d0d0f');
+      const dark = (0.2126 * fg[0] + 0.7152 * fg[1] + 0.0722 * fg[2]) / 255 > 0.5;
+
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
 
-      // Put dot centres on PAGE multiples of the pitch, so the portrait
-      // lines up with the background dots wherever the canvas sits.
       const r = canvas.getBoundingClientRect();
+      // Where the flood ends, in canvas pixels (split mode only).
+      let edge = -Infinity;
+      if (split) {
+        const flood = document.querySelector('.flood');
+        if (flood) edge = flood.getBoundingClientRect().bottom - r.top;
+      }
+      // Dot centres on PAGE multiples of the pitch, so they line up with
+      // the background dots wherever the canvas sits.
       const left = r.left + scrollX, top = r.top + scrollY;
       const x0 = Math.ceil(left / pitch) * pitch - left;
       const y0 = Math.ceil(top / pitch) * pitch - top;
@@ -135,49 +162,72 @@ const { src = '/portrait/sam.png', alt = 'Portrait of Sam, drawn in dots' } = As
       }
 
       for (let y = y0; y < h; y += pitch) {
+        const onFlood = y < edge;
+        // On the flood: ink, positive (dark = big). Below: theme colours.
+        const base = onFlood ? ink : fg;
+        const lit = onFlood ? fg : accent;
+        const flip = onFlood ? false : dark;
         for (let x = x0; x < w; x += pitch) {
           const [l, a] = sample(x / w, y / h);
-          if (a < 0.5) continue; // background: let the page dots show through
-          const t = dark ? l : 1 - l; // how much "ink" this dot gets
+          if (a < 0.5) continue; // background: let the page show through
+          const t = flip ? l : 1 - l; // how much "ink" this dot gets
 
-          // Lit spot: 1 at the pointer, 0 at LIT_RADIUS, smooth in between.
-          let k = 0;
-          if (pointer) {
-            const d = Math.hypot(x - pointer.x, y - pointer.y) / LIT_RADIUS;
-            k = d < 1 ? 1 - d * d * (3 - 2 * d) : 0;
+          // Near the pointer: push away and light up.
+          let dx = 0, dy = 0, k = 0;
+          if (p.level > 0.01) {
+            const ex = x - p.x, ey = y - p.y;
+            const d = Math.hypot(ex, ey);
+            if (d < REACH) {
+              const f = 1 - d / REACH;
+              k = f * f * (3 - 2 * f) * p.level;
+              if (!reducedMotion() && d > 0.01) {
+                const push = f * f * PUSH * p.level;
+                dx = (ex / d) * push;
+                dy = (ey / d) * push;
+              }
+            }
           }
-          const c = rgb.map((v, i) => Math.round(v + (ORANGE[i] - v) * k));
+          const c = mix(base, lit, k);
           ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
 
           if (mode === 'ascii') {
             const ch = RAMP[Math.min(RAMP.length - 1, Math.floor(t * RAMP.length))];
-            if (ch !== ' ') ctx.fillText(ch, x, y);
+            if (ch !== ' ') ctx.fillText(ch, x + dx, y + dy);
           } else {
             const radius = Math.max(1.2, t * pitch * 0.5) * (1 + 0.3 * k);
             ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.arc(x + dx, y + dy, radius, 0, Math.PI * 2);
             ctx.fill();
           }
         }
       }
     }
 
-    // Redraw at most once per frame, however fast the pointer moves.
-    const schedule = () => {
-      if (!raf) raf = requestAnimationFrame(() => { raf = 0; draw(); });
-    };
+    // Ease the pointer and its strength, redraw until settled.
+    function step() {
+      raf = 0;
+      const e = reducedMotion() ? 1 : 0.25;
+      p.x += (p.tx - p.x) * e;
+      p.y += (p.ty - p.y) * e;
+      p.level += (p.target - p.level) * (reducedMotion() ? 1 : 0.15);
+      draw();
+      if (Math.abs(p.tx - p.x) > 0.3 || Math.abs(p.ty - p.y) > 0.3 || Math.abs(p.target - p.level) > 0.01) {
+        raf = requestAnimationFrame(step);
+      }
+    }
+    const kick = () => { if (!raf) raf = requestAnimationFrame(step); };
 
-    canvas.addEventListener('pointermove', (e) => {
+    function point(e: PointerEvent) {
       const r = canvas.getBoundingClientRect();
-      pointer = { x: e.clientX - r.left, y: e.clientY - r.top };
-      schedule();
-    }, { signal });
-    canvas.addEventListener('pointerdown', (e) => {
-      const r = canvas.getBoundingClientRect();
-      pointer = { x: e.clientX - r.left, y: e.clientY - r.top };
-      schedule();
-    }, { signal });
-    canvas.addEventListener('pointerleave', () => { pointer = null; schedule(); }, { signal });
+      p.tx = e.clientX - r.left;
+      p.ty = e.clientY - r.top;
+      if (p.level < 0.05) { p.x = p.tx; p.y = p.ty; } // start under the pointer
+      p.target = 1;
+      kick();
+    }
+    canvas.addEventListener('pointermove', point, { signal });
+    canvas.addEventListener('pointerdown', point, { signal });
+    canvas.addEventListener('pointerleave', () => { p.target = 0; kick(); }, { signal });
 
     buttons.forEach((b) => b.addEventListener('click', () => {
       mode = b.dataset.mode as Mode;
@@ -185,10 +235,10 @@ const { src = '/portrait/sam.png', alt = 'Portrait of Sam, drawn in dots' } = As
       draw();
     }, { signal }));
 
-    // Theme changes: redraw when the html attributes or the OS scheme change.
+    // Redraw on theme change and on scroll (split mode tracks the flood edge).
     const mo = new MutationObserver(() => draw());
     mo.observe(document.documentElement, { attributes: true });
-    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw, { signal });
+    if (split) addEventListener('scroll', () => kick(), { passive: true, signal });
 
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
@@ -196,16 +246,18 @@ const { src = '/portrait/sam.png', alt = 'Portrait of Sam, drawn in dots' } = As
     loadMap(root.dataset.src!).then((m) => { map = m; resize(); });
     document.fonts?.ready.then(draw);
 
-    cleanup = () => {
-      ac.abort();
-      mo.disconnect();
-      ro.disconnect();
-      cancelAnimationFrame(raf);
-    };
+    return () => { ac.abort(); mo.disconnect(); ro.disconnect(); cancelAnimationFrame(raf); };
   }
 
-  document.addEventListener('astro:page-load', init);
-  document.addEventListener('astro:before-swap', () => { cleanup?.(); cleanup = null; });
+  let cleanups: (() => void)[] = [];
+  document.addEventListener('astro:page-load', () => {
+    cleanups.forEach((c) => c());
+    cleanups = [...document.querySelectorAll<HTMLElement>('[data-portrait]')].map(mount);
+  });
+  document.addEventListener('astro:before-swap', () => {
+    cleanups.forEach((c) => c());
+    cleanups = [];
+  });
 </script>
 
 <style>
@@ -216,14 +268,34 @@ const { src = '/portrait/sam.png', alt = 'Portrait of Sam, drawn in dots' } = As
     gap: var(--grid);
   }
   .portrait__stage {
+    display: block;
     aspect-ratio: 1;
     width: 100%;
+    color: inherit;
+  }
+  a.portrait__stage {
+    cursor: pointer;
   }
   canvas {
     display: block;
     width: 100%;
     height: 100%;
     cursor: crosshair;
+  }
+  a.portrait__stage canvas {
+    cursor: pointer;
+  }
+
+  .portrait__hint {
+    align-self: flex-end;
+    margin-top: calc(var(--grid) * -1);
+    opacity: 0.5;
+    transition: opacity var(--transition);
+  }
+  .portrait:hover .portrait__hint,
+  .portrait:focus-within .portrait__hint {
+    opacity: 1;
+    color: var(--orange-text);
   }
 
   .portrait__modes {

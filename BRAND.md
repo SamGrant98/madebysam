@@ -43,4 +43,6 @@ Colour never the only signal. Visible orange focus ring. Respect `prefers-reduce
 ## Motion
 - Three speeds, one curve: `--dur-fast` 120ms (hovers, presses), `--dur-base` 200ms (state, colour), `--dur-slow` 400ms (page fades, image zooms), all on `--ease-out`. `--transition` = base + ease-out.
 - Motion explains a change (a crumb arriving, a page leaving) or answers the visitor (lit dots, hover). Nothing moves on its own except the lab drift.
+- Page colour (`--page-accent`): orange, or the category on project pages. Text selection and the lit dots use it.
+- Lit layer: dots on paper light up in the page colour; glyphs on floods light up in the text colour (black in light mode, white in dark). The home portrait reacts to the cursor (dots pushed aside, lit) and links to /about.
 - Reduced motion: CSS motion is switched off globally in `global.css`. Scripts check `src/lib/motion.ts`; the light snaps instead of easing, the lab map stands still, tilt is off, scrolls jump.

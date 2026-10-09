@@ -5,12 +5,6 @@ import type { CategoryKey } from '../lib/categories';
 export const site = {
   email: 'samgrantarab@gmail.com',
 
-  /**
-   * The "Now" line on the home page: one line about what you're building
-   * right now. Leave it empty ('') and the Now strip simply doesn't show.
-   */
-  now: '',
-
   /** Profile links. Empty url = not shown (about page + footer). */
   links: [
     { label: 'GitHub', url: '' },
@@ -29,7 +23,6 @@ export const site = {
     spec: {
       role: 'creative technologist',
       at: 'SeymourPowell, London',
-      also: 'SP Lab',
       based: 'UK',
       stack: ['JavaScript', 'TypeScript', 'Three.js', 'Unity (C#)', 'Meta Quest', 'Web AR'],
     },
@@ -44,7 +37,6 @@ export const site = {
     log: [
       { when: 'now', what: 'building in the lab, madebysam.dev' },
       { when: '', what: 'creative technology, SeymourPowell' },
-      { when: '', what: 'co-owner, SP Lab' },
       { when: '', what: 'video game design' },
     ],
   },

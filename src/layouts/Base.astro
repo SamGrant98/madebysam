@@ -2,6 +2,7 @@
 import { ClientRouter } from 'astro:transitions';
 import SiteHeader, { type Crumb } from '../components/SiteHeader.astro';
 import LitDots from '../components/LitDots.astro';
+import type { CategoryKey } from '../lib/categories';
 import '../styles/global.css';
 
 interface Props {
@@ -17,6 +18,9 @@ interface Props {
   // astro.config so social crawlers get an absolute URL. Falls back to the
   // site-wide default at /og-default.png.
   ogImage?: string;
+  // The page's colour: brand orange, or a category on project pages.
+  // Drives text selection and the lit dots (html[data-accent] in global.css).
+  accent?: CategoryKey | 'brand';
 }
 
 const {
@@ -24,6 +28,7 @@ const {
   description = 'Personal site & creative web experiments by Sam Grant.',
   breadcrumb = [],
   ogImage,
+  accent = 'brand',
 } = Astro.props;
 
 const canonicalUrl = new URL(Astro.url.pathname, Astro.site).href;
@@ -31,7 +36,7 @@ const resolvedOgImage = new URL(ogImage ?? '/og-default.png', Astro.site).href;
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" data-accent={accent}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />

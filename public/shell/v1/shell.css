@@ -1,0 +1,124 @@
+/* made by sam · lab app shell · v1
+   A light shared layer for lab apps (dvd.madebysam.dev and friends):
+   the brand path back to the main site, and brand tokens an app can use
+   for its main action. It never restyles the app itself.
+
+   Loaded from madebysam.dev, so fonts come from the main site too
+   (vercel.json allows other madebysam.dev subdomains to fetch them).
+   Everything is prefixed msd- so it can't collide with app styles. */
+
+@font-face {
+  font-family: 'MSD Switzer';
+  src: url('../../fonts/switzer/Switzer-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'MSD Switzer';
+  src: url('../../fonts/switzer/Switzer-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'MSD Martian Mono';
+  src: url('../../fonts/martian-mono/martian-mono-latin-400-normal.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+/* Tokens an app may use, e.g. background: var(--msd-orange, white).
+   The fallback keeps the app working if the shell ever fails to load. */
+:root {
+  --msd-ink: #0d0d0f;
+  --msd-paper: #f3f2ee;
+  --msd-orange: #ff6601;
+  --msd-font: 'MSD Switzer', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --msd-mono: 'MSD Martian Mono', ui-monospace, monospace;
+}
+
+/* ---- The path bar ----
+   Same height (72px) and side margins (24 / 48 / 96px) as the main site's
+   header, so "made by sam" doesn't jump when you cross between sites. */
+.msd-shell {
+  --msd-fg: var(--msd-ink);
+  --msd-muted: rgb(13 13 15 / 0.55);
+  --msd-hover: #a43e00;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 2147483000;
+  box-sizing: border-box;
+  height: 72px;
+  padding: 0 24px;
+  display: flex;
+  align-items: baseline;
+  align-content: center;
+  flex-wrap: wrap;
+  gap: 0 0.6em;
+  color: var(--msd-fg);
+  font: 700 16px/72px var(--msd-font);
+  letter-spacing: -0.02em;
+  pointer-events: none; /* only the links take clicks, the app stays usable */
+  -webkit-font-smoothing: antialiased;
+}
+.msd-shell[data-theme='dark'] {
+  --msd-fg: var(--msd-paper);
+  --msd-muted: rgb(243 242 238 / 0.55);
+  --msd-hover: var(--msd-orange);
+  /* lab apps are busy (3D, video): a soft shadow keeps the path legible */
+  text-shadow: 0 1px 6px rgb(0 0 0 / 0.5);
+}
+@media (min-width: 641px) {
+  .msd-shell { padding: 0 48px; }
+}
+@media (min-width: 1025px) {
+  .msd-shell { padding: 0 96px; }
+}
+
+.msd-shell a {
+  color: inherit;
+  text-decoration: none;
+  pointer-events: auto;
+  transition: color 200ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.msd-shell a:hover {
+  color: var(--msd-hover);
+}
+.msd-shell a:focus-visible {
+  outline: 2px solid var(--msd-orange);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.msd-shell__sep,
+.msd-shell__crumb {
+  font: 400 12px/72px var(--msd-mono);
+  letter-spacing: 0;
+}
+.msd-shell__sep {
+  color: var(--msd-muted);
+}
+.msd-shell__crumb {
+  color: var(--msd-muted);
+}
+.msd-shell__crumb--cat {
+  color: var(--msd-cat, var(--msd-muted));
+}
+.msd-shell__crumb--here {
+  color: var(--msd-fg);
+}
+
+/* Phones: drop the category to save room ("made by sam / lab / dvd-shelf"). */
+@media (max-width: 640px) {
+  .msd-shell [data-msd-cat] { display: none; }
+}
+
+/* Leaving for another madebysam.dev site: fade out first (shell.js). */
+html.msd-leaving body {
+  opacity: 0;
+  transition: opacity 400ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .msd-shell a,
+  html.msd-leaving body { transition: none; }
+}

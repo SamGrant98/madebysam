@@ -39,3 +39,8 @@ Calm, confident, understated, dry humour. Short sentences, plain words. Avoid: t
 
 ## Accessibility
 Colour never the only signal. Visible orange focus ring. Respect `prefers-reduced-motion`.
+
+## Motion
+- Three speeds, one curve: `--dur-fast` 120ms (hovers, presses), `--dur-base` 200ms (state, colour), `--dur-slow` 400ms (page fades, image zooms), all on `--ease-out`. `--transition` = base + ease-out.
+- Motion explains a change (a crumb arriving, a page leaving) or answers the visitor (lit dots, hover). Nothing moves on its own except the lab drift.
+- Reduced motion: CSS motion is switched off globally in `global.css`. Scripts check `src/lib/motion.ts`; the light snaps instead of easing, the lab map stands still, tilt is off, scrolls jump.

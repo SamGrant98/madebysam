@@ -83,6 +83,8 @@ const resolvedOgImage = new URL(ogImage ?? '/og-default.png', Astro.site).href;
     {/* Outbound fade for cross-origin links (sibling subdomains).
         Re-runs on every Astro page-load so re-rendered cards keep working. */}
     <script>
+      import { reducedMotion } from '../lib/motion';
+
       function bindCrossOriginFade() {
         document
           .querySelectorAll('a[href*="madebysam.dev"]:not([data-fade-bound])')
@@ -100,9 +102,10 @@ const resolvedOgImage = new URL(ogImage ?? '/og-default.png', Astro.site).href;
             a.addEventListener('click', (e) => {
               if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
               if (a.target === '_blank') return;
+              if (reducedMotion()) return; // no fade: let the link go straight away
               e.preventDefault();
               document.body.classList.add('is-leaving');
-              setTimeout(() => { window.location.href = a.href; }, 300);
+              setTimeout(() => { window.location.href = a.href; }, 400); // = --dur-slow
             });
           });
       }
@@ -141,8 +144,8 @@ const resolvedOgImage = new URL(ogImage ?? '/og-default.png', Astro.site).href;
      ClientRouter; this only kicks in for the inbound paint and for outbound
      clicks to sibling subdomains (e.g. dvd.madebysam.dev), so the jump
      across origins feels continuous instead of a hard cut. */
-  body { animation: page-fade-in 0.4s ease-out; }
-  body.is-leaving { transition: opacity 0.3s ease-out; opacity: 0; }
+  body { animation: page-fade-in var(--dur-slow) var(--ease-out); }
+  body.is-leaving { transition: opacity var(--dur-slow) var(--ease-out); opacity: 0; }
   @keyframes page-fade-in {
     from { opacity: 0; }
     to   { opacity: 1; }

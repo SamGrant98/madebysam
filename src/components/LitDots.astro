@@ -30,6 +30,8 @@
 </style>
 
 <script>
+  import { reducedMotion } from '../lib/motion';
+
   const GRID = 24;
   const RADIUS = 144; // px: how far the light reaches (6 cells)
   const EASE = 0.18; // how quickly the light catches up with its target
@@ -39,7 +41,7 @@
   if (canvas && !canvas.dataset.ready) {
     canvas.dataset.ready = '1';
     const ctx = canvas.getContext('2d')!;
-    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduce = reducedMotion();
 
     let w = 0, h = 0, dpr = 1;
     // Where the light is, where it's heading, and how bright it is (0..1).

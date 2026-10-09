@@ -52,7 +52,12 @@
   --color-bg: var(--paper);
   --color-fg: var(--ink);
 
-  --transition: 0.2s ease;
+  /* motion: three speeds, one curve. Reduced motion zeroes them (bottom of file). */
+  --dur-fast: 120ms; /* hovers, presses */
+  --dur-base: 200ms; /* state and colour changes */
+  --dur-slow: 400ms; /* page fades, image zooms */
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1); /* quick start, soft landing */
+  --transition: var(--dur-base) var(--ease-out);
 }
 
 :root[data-theme='dark'] {
@@ -263,5 +268,24 @@ pre {
     overscroll-behavior: none;
     touch-action: none;
     height: 100%;
+  }
+}
+
+/* Reduced motion: one switch for the whole site. Anything animated in CSS
+   finishes instantly, so new components get this for free. Scripts that
+   move things themselves check src/lib/motion.ts. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0.01ms;
+    --dur-base: 0.01ms;
+    --dur-slow: 0.01ms;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

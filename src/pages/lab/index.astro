@@ -114,6 +114,7 @@ const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
 </Base>
 
 <script>
+  import { reducedMotion } from '../../lib/motion';
   // Bundled script: runs once, then re-inits on every visit via
   // astro:page-load, and tears down on astro:before-swap (same pattern as
   // SiteHeader).
@@ -134,7 +135,7 @@ const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
 
     const ac = new AbortController();
     const { signal } = ac;
-    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduceMotion = reducedMotion();
     const touch = matchMedia('(hover: none)').matches;
 
     // ---- Map / list toggle (remembered per browser) ----
@@ -406,7 +407,7 @@ const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
     box-shadow:
       0 0 0 1px color-mix(in oklab, var(--color-fg) 16%, transparent),
       0 0 0 6px var(--color-bg);
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    transition: box-shadow var(--transition), transform var(--transition);
   }
   .node--live .node__mark {
     box-shadow:

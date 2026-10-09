@@ -1,7 +1,7 @@
 ---
 title: Palette Generator
 blurb: Throw a photo at it, get a colour system out.
-status: sketching
+status: wip
 category: play
 order: 3
 mapPosition:
@@ -26,4 +26,4 @@ _[Sam: write your why]_
 
 ## Status
 
-Sketching.
+Work in progress.

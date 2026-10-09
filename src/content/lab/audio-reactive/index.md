@@ -1,7 +1,7 @@
 ---
 title: Audio Reactive
 blurb: 'Mic input drives a shader: volume, frequency, beat.'
-status: sketching
+status: wip
 category: sound
 order: 4
 mapPosition:
@@ -26,4 +26,4 @@ _[Sam: write your why]_
 
 ## Status
 
-Sketching.
+Work in progress.

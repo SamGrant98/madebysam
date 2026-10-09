@@ -1,7 +1,7 @@
 ---
 title: Topo Playground
 blurb: Same shader as this background, with knobs.
-status: sketching
+status: wip
 category: play
 stack:
   - OGL
@@ -30,4 +30,4 @@ _[Sam: write where the topo shader came from in your head]_
 
 ## Status
 
-Sketching. Shader internals are stable from the site itself; just needs a UI panel and parameter exposure.
+Work in progress. Shader internals are stable from the site itself; just needs a UI panel and parameter exposure.

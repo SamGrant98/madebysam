@@ -24,7 +24,7 @@ const lab = defineCollection({
     z.object({
       title: z.string(),
       blurb: z.string(),
-      status: z.enum(['live', 'sketching', 'parked']),
+      status: z.enum(['live', 'wip', 'parked']),
       // Brand categories. Chosen by what the project is FOR, not what it's
       // built with (see BRAND.md). Labels, glyphs and colours live in
       // src/lib/categories.ts.

@@ -96,14 +96,24 @@ const selected = (await getCollection('lab'))
   /* Desktop: portrait on the right, heading keeps clear of it. */
   @media (min-width: 1025px) {
     .hero {
-      --portrait: clamp(calc(var(--grid) * 16), 34vw, calc(var(--grid) * 22));
+      /* 40% of the screen width, from 16 cells (384px) up to 44 (1056px) */
+      --portrait: clamp(calc(var(--grid) * 16), 40vw, calc(var(--grid) * 44));
+    }
+    /* A taller flood on big screens, so the bigger head still fits on it. */
+    .hero :global(.hero__flood) {
+      min-height: min(82svh, 920px);
+      min-height: round(down, min(82svh, 920px), var(--grid));
     }
     .hero__portrait {
       margin-right: var(--page-margin);
     }
     .hero :global(.hero__flood .flood__content) {
       padding-bottom: calc(var(--grid) * 3);
-      max-width: calc(100% - var(--portrait) - var(--grid) * 2);
+    }
+    /* The heading scales with the screen so it stays three lines and
+       keeps clear of the head on the right. */
+    .home-h1 {
+      font-size: clamp(2.75rem, 6vw, 7rem);
     }
   }
 

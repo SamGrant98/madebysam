@@ -3,9 +3,8 @@
 // orange. One per page, at the top (see BRAND.md › Flood).
 //
 // Everything on a flood is ink (--flood-fg): text, the accent word, tags,
-// marks. The background grid uses the same Glyph geometry as everywhere
-// else, repeated as an SVG pattern, so it costs nothing at runtime and
-// works without JavaScript. The interactive "lit" layer (cursor, tilt,
+// marks. The background is a GlyphField: the same Glyph geometry as
+// everywhere else, repeated as an SVG pattern and locked to the page grid. The interactive "lit" layer (cursor, tilt,
 // tap) will sit on top of this later as a separate component.
 //
 // Usage:
@@ -15,7 +14,7 @@
 //     <p>A 3D shelf for your physical media.</p>
 //     <Fragment slot="meta"><span class="flood-tag">play</span></Fragment>
 //   </FloodHero>
-import Glyph from './Glyph.astro';
+import GlyphField from './GlyphField.astro';
 import { BRAND, CATEGORIES, type CategoryKey } from '../lib/categories';
 
 interface Props {
@@ -32,8 +31,6 @@ const { tone, marks = 'glyphs', live = false, class: className } = Astro.props;
 const info = tone === 'brand' ? BRAND : CATEGORIES[tone];
 const kind = marks === 'glyphs' ? info.glyph : 'dot';
 
-// SVG pattern ids are global to the whole page, so give each flood its own.
-const patternId = `flood-grid-${tone}-${Math.random().toString(36).slice(2, 8)}`;
 const hasMeta = Astro.slots.has('meta') || live;
 ---
 
@@ -42,19 +39,7 @@ const hasMeta = Astro.slots.has('meta') || live;
   style={`--flood-bg: ${info.color}`}
   data-tone={tone}
 >
-  <svg class="flood__grid" aria-hidden="true">
-    <defs>
-      {/* x/y = -12 puts glyph centres on the grid lines for a flood at the
-          top-left of the page. The script below corrects it for floods
-          further down. */}
-      <pattern id={patternId} x="-12" y="-12" width="24" height="24" patternUnits="userSpaceOnUse" data-flood-pattern>
-        <g class="flood__mark">
-          <Glyph kind={kind} variant="grid" size={24} />
-        </g>
-      </pattern>
-    </defs>
-    <rect width="100%" height="100%" fill={`url(#${patternId})`}></rect>
-  </svg>
+  <GlyphField kind={kind} color="var(--flood-fg)" opacity="var(--flood-mark-opacity)" />
 
   <div class="flood__content">
     {Astro.slots.has('eyebrow') && (
@@ -72,37 +57,6 @@ const hasMeta = Astro.slots.has('meta') || live;
   </div>
 </section>
 
-<script>
-  // Keep every flood's dots on the PAGE grid, wherever the flood sits.
-  // An SVG pattern tiles from the SVG's own corner, so a flood that starts
-  // at y = 830 would be 830 % 24 = 14px out of step. Shift each pattern's
-  // origin by the flood's position on the page to cancel that out.
-  const GRID = 24;
-  function alignFloods() {
-    document.querySelectorAll<SVGPatternElement>('[data-flood-pattern]').forEach((pattern) => {
-      const flood = pattern.closest('.flood');
-      if (!flood) return;
-      const r = flood.getBoundingClientRect();
-      const left = r.left + window.scrollX;
-      const top = r.top + window.scrollY;
-      // -12: glyphs are drawn centred in their 24px tile; dots belong ON the lines.
-      pattern.setAttribute('x', String(-((left + GRID / 2) % GRID)));
-      pattern.setAttribute('y', String(-((top + GRID / 2) % GRID)));
-    });
-  }
-
-  let observer: ResizeObserver | null = null;
-  document.addEventListener('astro:page-load', () => {
-    alignFloods();
-    document.fonts?.ready.then(alignFloods); // web fonts can shift layout
-    // Anything that changes the page's height can move floods further down.
-    observer?.disconnect();
-    observer = new ResizeObserver(alignFloods);
-    observer.observe(document.body);
-  });
-  document.addEventListener('astro:before-swap', () => observer?.disconnect());
-</script>
-
 <style>
   .flood {
     position: relative;
@@ -116,18 +70,6 @@ const hasMeta = Astro.slots.has('meta') || live;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
-  }
-
-  .flood__grid {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    z-index: -1;
-    color: var(--flood-fg);
-  }
-  .flood__mark {
-    opacity: var(--flood-mark-opacity);
   }
 
   .flood__content {

@@ -1,45 +1,174 @@
 ---
+// Home: say hello, then show the work.
+// Sections with data-path feed the header's path as you scroll
+// (made by sam / now, made by sam / selected, …).
+import { getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
+import FloodHero from '../components/FloodHero.astro';
+import ProjectCard from '../components/ProjectCard.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import Glyph from '../components/Glyph.astro';
+import { CATEGORIES, CATEGORY_KEYS } from '../lib/categories';
+import { site } from '../data/site';
+
+// Same ordering as the lab (frontmatter `order`), first four.
+const selected = (await getCollection('lab'))
+  .sort((a, b) => a.data.order - b.data.order)
+  .slice(0, 4);
 ---
 
-<Base title="made by sam">
-  <section class="hero">
-    <p class="eyebrow">Sam Grant</p>
-    <h1>I enjoy making things. Hope you enjoy them too.</h1>
-    <p class="lede">
-      Creative technologist based in the UK. I work across the web, XR, and immersive experiences, and I'm always building something in the <a href="/lab" class="underline">/lab</a>.
+<Base title="made by sam" showTopo={false}>
+  <FloodHero tone="brand" marks="dots">
+    <span slot="eyebrow" class="home-eyebrow">Sam Grant</span>
+    <h1 class="display home-h1">
+      I enjoy <span class="accent">making</span> things. Hope you enjoy them too.
+    </h1>
+  </FloodHero>
+
+  <section class="intro">
+    <p class="intro__lede">
+      Creative technologist based in the UK. I work across the web, XR, and immersive
+      experiences, and I'm always building something in the
+      <a href="/lab" class="underline">/lab</a>.
     </p>
+    {site.now && (
+      <div class="now" data-path="now">
+        <span class="label now__label">Now</span>
+        <p class="now__text">{site.now}</p>
+      </div>
+    )}
   </section>
+
+  <section class="selected" data-path="selected">
+    <div class="section-head">
+      <h2 class="display section-h2">Selected</h2>
+      <a href="/lab" class="label underline">all in the lab</a>
+    </div>
+    <div class="selected__grid">
+      {selected.map((entry) => <ProjectCard entry={entry} />)}
+    </div>
+  </section>
+
+  <section class="instruments" data-path="instruments">
+    <p class="display instruments__line">Instruments for sound, movement, space and play.</p>
+    <div class="instruments__side">
+      <ul class="chips" aria-label="Categories">
+        {CATEGORY_KEYS.map((key) => (
+          <li class="chip" style={`color: ${CATEGORIES[key].textColor}`}>
+            <Glyph kind={CATEGORIES[key].glyph} size={12} />
+            {key}
+          </li>
+        ))}
+      </ul>
+      <a href="/lab" class="button">Open the lab</a>
+    </div>
+  </section>
+
+  <SiteFooter />
 </Base>
 
 <style>
-  .hero {
+  /* Every block pads in whole cells and starts at the page margin, so all
+     edges land on dot columns (press G in dev to check). */
+
+  .home-eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .home-h1 {
+    margin: 0;
+    font-size: clamp(2.75rem, 8vw, 7rem);
+    max-width: 13ch;
+  }
+
+  .intro {
+    padding: calc(var(--grid) * 2) var(--page-margin);
+    border-bottom: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--grid) calc(var(--grid) * 3);
+    align-items: baseline;
+  }
+  .intro__lede {
+    flex: 999 1 30rem;
+    margin: 0;
+    font-size: clamp(1.25rem, 2.2vw, 1.875rem);
+    line-height: 1.35;
+    max-width: 34ch;
+  }
+  .now {
+    flex: 1 1 18rem;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    min-height: 100vh;
-    max-width: 56rem;
-    padding: var(--space-8) var(--space-4);
-    margin: 0 auto;
-    gap: var(--space-3);
+    gap: calc(var(--grid) / 3);
   }
-  .eyebrow {
-    font-family: var(--font-mono);
-    font-size: 0.85rem;
-    color: var(--color-accent);
-    letter-spacing: 0.05em;
+  .now__label {
     text-transform: uppercase;
+    opacity: 0.6;
   }
-  h1 {
-    font-size: clamp(2.25rem, 6vw, 4.25rem);
-    max-width: 22ch;
-    color: var(--color-fg);
+  .now__text {
+    margin: 0;
   }
-  .lede {
-    font-size: clamp(1rem, 1.5vw, 1.15rem);
-    max-width: 42ch;
-    color: var(--color-fg);
-    opacity: 0.75;
-    margin-top: var(--space-2);
+
+  .selected {
+    padding: calc(var(--grid) * 3) var(--page-margin) calc(var(--grid) * 4);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--grid) * 2);
+  }
+  .section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--grid);
+  }
+  .section-h2 {
+    margin: 0;
+    font-size: clamp(2rem, 4vw, 3rem);
+  }
+  .selected__grid {
+    display: grid;
+    /* 19 cells wide minimum (456px), so two columns from tablet up. */
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 456px), 1fr));
+    gap: calc(var(--grid) * 3) calc(var(--grid) * 2);
+  }
+
+  .instruments {
+    padding: calc(var(--grid) * 3) var(--page-margin);
+    border-top: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--grid) * 2) calc(var(--grid) * 4);
+    align-items: flex-end;
+  }
+  .instruments__line {
+    flex: 1 1 28rem;
+    margin: 0;
+    font-size: clamp(2rem, 4.4vw, 4rem);
+    max-width: 18ch;
+  }
+  .instruments__side {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--grid);
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--grid) / 3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.35em 0.9em;
+    border: 1px solid color-mix(in oklab, var(--color-fg) 14%, transparent);
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
   }
 </style>

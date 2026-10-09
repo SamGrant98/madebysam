@@ -1,0 +1,118 @@
+---
+// One lab project as a card: image (or a field of its category glyph),
+// category + status line, title, blurb. The whole card is one link.
+import { Image } from 'astro:assets';
+import type { CollectionEntry } from 'astro:content';
+import Glyph from './Glyph.astro';
+import GlyphField from './GlyphField.astro';
+import { CATEGORIES } from '../lib/categories';
+
+interface Props {
+  entry: CollectionEntry<'lab'>;
+}
+
+const { entry } = Astro.props;
+const d = entry.data;
+const cat = CATEGORIES[d.category];
+---
+
+<a
+  href={`/lab/${entry.id}`}
+  class="card"
+  style={`--cat: ${cat.color}; --cat-text: ${cat.textColor}`}
+>
+  <div class="card__media">
+    {d.screenshot ? (
+      <Image
+        src={d.screenshot}
+        alt=""
+        widths={[480, 800, 1200]}
+        sizes="(min-width: 1025px) 45vw, 100vw"
+      />
+    ) : (
+      <GlyphField kind={cat.glyph} color="var(--cat-text)" opacity={0.5} />
+    )}
+  </div>
+  <span class="card__meta">
+    <span class="card__cat"><Glyph kind={cat.glyph} size={12} /> {d.category}</span>
+    {d.status === 'live' ? (
+      <span class="card__live"><i aria-hidden="true"></i>live</span>
+    ) : (
+      <span class="card__status">{d.status}</span>
+    )}
+  </span>
+  <span class="card__title">{d.title}</span>
+  <span class="card__blurb">{d.blurb}</span>
+</a>
+
+<style>
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--grid) / 2);
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .card__media {
+    position: relative;
+    isolation: isolate; /* keeps the GlyphField's z-index inside the card */
+    aspect-ratio: 16 / 10;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+    background: color-mix(in oklab, var(--color-fg) 4%, var(--color-bg));
+    margin-bottom: calc(var(--grid) / 2);
+  }
+  .card__media :global(img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.4s ease;
+  }
+  .card:hover .card__media :global(img) {
+    transform: scale(1.02);
+  }
+
+  .card__meta {
+    display: flex;
+    gap: var(--grid);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+  .card__cat {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    color: var(--cat-text);
+  }
+  .card__status {
+    opacity: 0.6;
+  }
+  .card__live {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+  }
+  .card__live i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1.5px var(--orange);
+  }
+
+  .card__title {
+    font-weight: 700;
+    font-size: clamp(1.375rem, 2vw, 1.75rem);
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+  .card:hover .card__title {
+    color: var(--orange-text);
+  }
+  .card__blurb {
+    opacity: 0.7;
+    max-width: 48ch;
+  }
+</style>

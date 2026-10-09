@@ -42,6 +42,8 @@
   --grid: var(--dot-spacing);
   --page-margin: 24px; /* 1 cell on phones, 2 on tablets, 4 on desktop */
   --header-h: 72px; /* 3 cells */
+  /* Resting dot colour: a faint mix of text into background, so it works in both themes. */
+  --dot-color: color-mix(in oklab, var(--color-fg) 14%, var(--color-bg));
 
   /* flood: one full-bleed hero per page, everything on it is ink */
   --flood-fg: var(--ink);
@@ -128,7 +130,18 @@ html[data-theme='dark'] {
 }
 
 body {
-  background: var(--color-bg);
+  background-color: var(--color-bg);
+  /* The page's dot grid. Body backgrounds are drawn from the page's
+     top-left and scroll with it, so these dots share an origin with every
+     other grid on the site. The -12px offset puts dots ON the lines.
+     (Pages with the topo canvas cover this with the same dots in WebGL.) */
+  background-image: radial-gradient(
+    circle,
+    var(--dot-color) var(--dot-size),
+    transparent calc(var(--dot-size) + 0.6px)
+  );
+  background-size: var(--grid) var(--grid);
+  background-position: calc(var(--grid) / -2) calc(var(--grid) / -2);
   color: var(--color-fg);
   font-family: var(--font-sans);
   font-size: 16px;
@@ -214,6 +227,24 @@ h3 {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   letter-spacing: 0.06em;
+}
+
+/* Primary action: orange fill, ink text, 44px tall for touch. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  min-height: 44px;
+  padding: 0 var(--grid);
+  border-radius: 999px;
+  background: var(--orange);
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform var(--transition);
+}
+.button:hover {
+  transform: translateY(-1px);
 }
 
 /* Tag on a flood: ink outline, ink text. */

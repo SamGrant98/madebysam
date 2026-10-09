@@ -58,8 +58,40 @@ const Stage = href ? 'a' : 'div';
   type PortraitMap = { data: Uint8ClampedArray; width: number; height: number };
   const PITCH: Record<Mode, number> = { dots: 12, big: 24, ascii: 12 };
   const RAMP = ' .:-=+*#%@'; // light to dark
-  const REACH = 110; // px around the pointer that react
-  const PUSH = 26; // px: how far dots get shoved at the pointer itself
+  const REACH = 260; // px around the pointer that react
+  const PUSH = 56; // px: how far dots get shoved at the pointer itself
+  const SWIRL = 0.4; // sideways twist, as a share of the push
+  const BIG = 720; // px: above this width, 'dots' mode uses the 24px grid
+  const GLYPH_AT = 0.3; // dots this close to the pointer (0..1) turn into glyphs
+  const GLYPHS = ['bar', 'chevron', 'plus', 'square'];
+
+  // Each dot gets its own glyph, picked at random but fixed (a hash of its
+  // grid position), so they don't flicker as the pointer moves.
+  function glyphFor(ix: number, iy: number) {
+    let h = Math.imul(ix, 73856093) ^ Math.imul(iy, 19349663);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return GLYPHS[(h >>> 0) % GLYPHS.length];
+  }
+
+  // The brand glyphs (same geometry as Glyph.astro, in a 24px cell),
+  // centred on x, y and scaled by s.
+  function drawGlyph(c: CanvasRenderingContext2D, kind: string, x: number, y: number, s: number) {
+    c.save();
+    c.translate(x, y);
+    c.scale(s, s);
+    c.translate(-12, -12);
+    c.beginPath();
+    if (kind === 'bar') { c.rect(11.1, 8.5, 1.8, 7); c.fill(); }
+    else if (kind === 'square') { c.rect(9.9, 9.9, 4.2, 4.2); c.fill(); }
+    else {
+      c.lineWidth = 1.6;
+      c.strokeStyle = c.fillStyle;
+      if (kind === 'chevron') { c.moveTo(10.5, 9); c.lineTo(13.5, 12); c.lineTo(10.5, 15); }
+      else { c.moveTo(9, 12); c.lineTo(15, 12); c.moveTo(12, 9); c.lineTo(12, 15); }
+      c.stroke();
+    }
+    c.restore();
+  }
 
   // Load each portrait map once, however many portraits use it.
   const maps = new Map<string, Promise<PortraitMap>>();
@@ -131,7 +163,8 @@ const Stage = href ? 'a' : 'div';
 
     function draw() {
       if (!map || !w) return;
-      const pitch = PITCH[mode];
+      // Big portraits stay coarse: same dot count, bigger dots, not more detail.
+      const pitch = mode === 'dots' && w > BIG ? 24 : PITCH[mode];
       // Colours from the tokens (not `color`, which fades with the theme).
       const cs = getComputedStyle(root);
       const fg = rgb(cs.getPropertyValue('--color-fg'));
@@ -181,9 +214,11 @@ const Stage = href ? 'a' : 'div';
               const f = 1 - d / REACH;
               k = f * f * (3 - 2 * f) * p.level;
               if (!reducedMotion() && d > 0.01) {
+                // Away from the pointer, plus a twist around it.
                 const push = f * f * PUSH * p.level;
-                dx = (ex / d) * push;
-                dy = (ey / d) * push;
+                const nx = ex / d, ny = ey / d;
+                dx = nx * push - ny * push * SWIRL;
+                dy = ny * push + nx * push * SWIRL;
               }
             }
           }
@@ -193,8 +228,14 @@ const Stage = href ? 'a' : 'div';
           if (mode === 'ascii') {
             const ch = RAMP[Math.min(RAMP.length - 1, Math.floor(t * RAMP.length))];
             if (ch !== ' ') ctx.fillText(ch, x + dx, y + dy);
+          } else if (k > GLYPH_AT) {
+            // Close to the pointer: the dot becomes one of the brand glyphs,
+            // sized from how much ink the dot had, growing with k.
+            const kind = glyphFor(Math.round((left + x) / pitch), Math.round((top + y) / pitch));
+            const s = (pitch / 24) * (1.6 + 2.4 * t) * (1 + 0.6 * k);
+            drawGlyph(ctx, kind, x + dx, y + dy, s);
           } else {
-            const radius = Math.max(1.2, t * pitch * 0.5) * (1 + 0.3 * k);
+            const radius = Math.max(1.4, t * pitch * 0.56) * (1 + 0.6 * k);
             ctx.beginPath();
             ctx.arc(x + dx, y + dy, radius, 0, Math.PI * 2);
             ctx.fill();

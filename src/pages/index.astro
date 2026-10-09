@@ -77,8 +77,8 @@ const selected = (await getCollection('lab'))
   }
 
   /* ---- Hero + portrait ----
-     --portrait is the portrait's width. It overlaps the flood by 60% of
-     its height and hangs 40% below it, onto the page. */
+     --portrait is the portrait's width. 70% of it sits on the flood and
+     30% hangs below, onto the page. */
   .hero {
     --portrait: min(calc(100vw - var(--page-margin) * 2), calc(var(--grid) * 14));
   }
@@ -86,12 +86,12 @@ const selected = (await getCollection('lab'))
     position: relative;
     z-index: 2; /* above the flood */
     width: var(--portrait);
-    margin: calc(var(--portrait) * -0.6) auto 0;
+    margin: calc(var(--portrait) * -0.7) auto 0;
   }
   /* Phones and tablets: the portrait is centred under the heading, so the
      flood gets extra room at the bottom for it. */
   .hero :global(.hero__flood .flood__content) {
-    padding-bottom: calc(var(--grid) * 3 + var(--portrait) * 0.6);
+    padding-bottom: calc(var(--grid) * 3 + var(--portrait) * 0.7);
   }
   /* Desktop: portrait on the right, heading keeps clear of it. */
   @media (min-width: 1025px) {

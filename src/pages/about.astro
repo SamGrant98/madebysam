@@ -1,88 +1,266 @@
 ---
+// About: Sam as one of his own instruments.
+//
+//   1. Hero: the Melodrama line + intro, beside the dot portrait. No flood
+//      here: the portrait is the hero, and it follows light/dark.
+//   2. What I do + a spec panel (same component as the project pages).
+//   3. What I play with: the four categories, each linking to its projects.
+//   4. Log: a short timeline.
+//   5. Get in touch.
+// All the words live in src/data/site.ts.
+import { getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
+import DotPortrait from '../components/DotPortrait.astro';
+import Glyph from '../components/Glyph.astro';
+import SpecPanel from '../components/SpecPanel.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import { CATEGORIES, CATEGORY_KEYS } from '../lib/categories';
+import { site, profileLinks } from '../data/site';
+
+const a = site.about;
+const entries = (await getCollection('lab')).sort((x, y) => x.data.order - y.data.order);
+const byCategory = Object.fromEntries(
+  CATEGORY_KEYS.map((k) => [k, entries.filter((e) => e.data.category === k)]),
+);
 ---
 
-<Base title="about — made by sam" breadcrumb={[{ label: 'about' }]}>
-  <article class="about">
-    <h1>About</h1>
-    <p class="lede">
-      I'm Sam, a creative technologist based in the UK with a background in game design and a career built across interactive experiences, immersive technology, and the web.
-    </p>
+<Base title="about / made by sam" description={a.intro} breadcrumb={[{ label: 'about' }]}>
+  <section class="hero">
+    <div class="hero__text">
+      <span class="label eyebrow">about</span>
+      <h1 class="hero__line">{a.line}</h1>
+      <p class="hero__intro">{a.intro}</p>
+    </div>
+    <div class="hero__portrait">
+      <DotPortrait />
+    </div>
+  </section>
 
-    <section>
-      <h2>What I do</h2>
-      <p>
-        I design and develop across a broad range of disciplines: websites, mobile apps, VR experiences, web AR, historic and cultural exhibitions, and interactive installations. My work spans concept and prototyping through to deployment.
-      </p>
-      <p>
-        Currently part of the creative technology team at SeymourPowell, a design and innovation consultancy in London. The <a href="/lab" class="underline">/lab</a> is where I build independently, personal projects and experiments outside of client work.
-      </p>
-    </section>
+  <section class="what">
+    <div class="what__text">
+      <h2 class="display h2">What I do</h2>
+      {a.whatIDo.map((p) => <p>{p}</p>)}
+    </div>
+    <div class="what__spec">
+      <SpecPanel title="Sam" rows={[
+        { label: 'role', value: a.spec.role },
+        { label: 'at', value: a.spec.at },
+        { label: 'also', value: a.spec.also },
+        { label: 'based', value: a.spec.based },
+        { label: 'stack', list: a.spec.stack },
+      ]} />
+    </div>
+  </section>
 
-    <section>
-      <h2>Stack</h2>
-      <div class="stack" aria-label="Stack">
-        <span class="chip">JavaScript</span>
-        <span class="chip">TypeScript</span>
-        <span class="chip">Three.js</span>
-        <span class="chip">Unity (C#)</span>
-        <span class="chip">Meta Quest</span>
-        <span class="chip">Web AR</span>
-      </div>
-    </section>
+  <section class="play" data-path="play">
+    <h2 class="display h2">What I play with</h2>
+    <ul class="play__grid">
+      {CATEGORY_KEYS.map((k) => {
+        const cat = CATEGORIES[k];
+        const made = byCategory[k];
+        return (
+          <li class="play__item" style={`--cat-text: ${cat.textColor}`}>
+            <Glyph kind={cat.glyph} size={24} />
+            <strong class="play__name">{cat.label}</strong>
+            <span class="play__desc">{a.play[k]}</span>
+            <span class="label play__made">
+              made:{' '}
+              {made.length > 0
+                ? made.map((e, i) => (
+                    <>{i > 0 && ' · '}<a href={`/lab/${e.id}`} class="underline">{e.data.title}</a></>
+                  ))
+                : <span class="play__soon">nothing yet</span>}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  </section>
 
-    <section>
-      <h2>Get in touch</h2>
-      <ul class="links">
-        <li><a href="mailto:samgrantarab@gmail.com" class="underline">samgrantarab@gmail.com</a></li>
-      </ul>
-    </section>
-  </article>
+  <section class="log" data-path="log">
+    <h2 class="display h2">Log</h2>
+    <ol class="log__list">
+      {a.log.map((row) => (
+        <li class="log__row label">
+          <span class:list={['log__when', { 'log__when--now': row.when === 'now' }]}>{row.when}</span>
+          <span>{row.what}</span>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <section class="contact" data-path="contact">
+    <h2 class="display h2">Get in touch</h2>
+    <div class="contact__row">
+      <a class="button" href={`mailto:${site.email}`}>{site.email}</a>
+      {profileLinks.map((l) => <a class="label underline" href={l.url}>{l.label}</a>)}
+    </div>
+  </section>
+
+  <SiteFooter />
 </Base>
 
 <style>
-  .about {
-    max-width: 42rem;
-    margin: 0 auto;
-    padding: calc(var(--space-8) * 1.5) var(--space-4) var(--space-8);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
+  /* Whole cells for padding and gaps, page margin at the sides. */
+
+  .h2 {
+    margin: 0;
+    font-size: clamp(2rem, 4vw, 3rem);
   }
-  h1 {
-    font-size: clamp(2rem, 5vw, 3rem);
-  }
-  h2 {
-    font-size: 1.25rem;
-    margin-bottom: var(--space-1);
-  }
-  .lede {
-    font-size: 1.15rem;
-    color: var(--color-fg);
-    opacity: 0.75;
-  }
-  section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-  .links {
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-  }
-  .stack {
+
+  /* ---- Hero ---- */
+  .hero {
+    padding: calc(var(--header-h) + var(--grid) * 2) var(--page-margin) calc(var(--grid) * 3);
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    align-items: flex-end;
+    gap: calc(var(--grid) * 2) calc(var(--grid) * 4);
   }
-  .chip {
-    font-size: 0.75rem;
-    padding: 4px 10px;
-    border: 1px solid color-mix(in oklab, var(--color-accent) 40%, transparent);
-    border-radius: 999px;
-    color: var(--color-accent);
-    opacity: 0.9;
+  .hero__text {
+    flex: 1 1 24rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--grid);
+  }
+  .eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.6;
+  }
+  .hero__line {
+    margin: 0;
+    font-family: var(--font-accent);
+    font-weight: var(--accent-weight);
+    font-size: clamp(2.75rem, 6.5vw, 6rem);
+    line-height: 1;
+    letter-spacing: -0.01em;
+    max-width: 14ch;
+  }
+  .hero__intro {
+    margin: 0;
+    font-size: clamp(1.125rem, 1.6vw, 1.25rem);
+    line-height: 1.5;
+    max-width: 38ch;
+  }
+  .hero__portrait {
+    /* Up to 22 cells wide (44 dots across in the default mode), shrinking
+       on narrow screens; wraps under the text on phones. */
+    flex: 0 1 calc(var(--grid) * 22);
+    min-width: min(100%, calc(var(--grid) * 13));
+  }
+
+  /* ---- What I do ---- */
+  .what {
+    padding: calc(var(--grid) * 3) var(--page-margin);
+    border-top: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--grid) * 2) calc(var(--grid) * 4);
+    align-items: flex-start;
+  }
+  .what__text {
+    flex: 999 1 28rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--grid);
+  }
+  .what__text p {
+    margin: 0;
+    font-size: 1.0625rem;
+    line-height: 1.6;
+    max-width: 62ch;
+    opacity: 0.88;
+  }
+  .what__spec {
+    flex: 1 1 18rem;
+  }
+
+  /* ---- What I play with ---- */
+  .play {
+    padding: calc(var(--grid) * 3) var(--page-margin);
+    border-top: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--grid) * 2);
+  }
+  .play__grid {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+    gap: calc(var(--grid) * 2);
+  }
+  .play__item {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--grid) / 2);
+    padding-top: var(--grid);
+    border-top: 1.5px solid var(--cat-text);
+  }
+  .play__item :global(svg) {
+    color: var(--cat-text);
+  }
+  .play__name {
+    font-size: 1.5rem;
+    letter-spacing: -0.02em;
+    color: var(--cat-text);
+  }
+  .play__desc {
+    line-height: 1.5;
+    opacity: 0.85;
+  }
+  .play__made {
+    opacity: 0.8;
+  }
+  .play__soon {
+    opacity: 0.6;
+  }
+
+  /* ---- Log ---- */
+  .log {
+    padding: calc(var(--grid) * 3) var(--page-margin);
+    border-top: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--grid) * 2);
+  }
+  .log__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    max-width: 48rem;
+  }
+  .log__row {
+    display: grid;
+    grid-template-columns: 6rem minmax(0, 1fr);
+    gap: var(--grid);
+    padding: calc(var(--grid) / 2) 0;
+    border-top: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+  }
+  .log__row:last-child {
+    border-bottom: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+  }
+  .log__when {
+    opacity: 0.55;
+  }
+  .log__when--now {
+    color: var(--orange-text);
+    opacity: 1;
+  }
+
+  /* ---- Contact ---- */
+  .contact {
+    padding: calc(var(--grid) * 3) var(--page-margin) calc(var(--grid) * 4);
+    border-top: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--grid) * 2);
+  }
+  .contact__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--grid);
   }
 </style>

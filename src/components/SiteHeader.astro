@@ -10,7 +10,7 @@
 // via data-state:
 //   flood  – over a FloodHero: everything ink, no glow, transparent
 //   solid  – scrolled past the flood (or down a normal page): page background
-//   clear  – top of a page with no flood (e.g. the lab map): the old glow
+//   clear  – top of a page with no flood: transparent, page colours
 import ThemeToggle from './ThemeToggle.astro';
 import { CATEGORIES, type CategoryKey } from '../lib/categories';
 
@@ -98,7 +98,7 @@ const crumbStyle = (c: Crumb) =>
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-3);
+    gap: var(--grid);
     box-sizing: border-box;
     height: var(--header-h);
     padding: 0 var(--page-margin);
@@ -110,12 +110,6 @@ const crumbStyle = (c: Crumb) =>
     border-bottom: 1px solid transparent;
   }
 
-  /* clear: top of a non-flood page. Soft glow keeps text readable over topo. */
-  .site-header[data-state='clear'] {
-    text-shadow:
-      0 0 6px var(--color-bg),
-      0 0 14px var(--color-bg);
-  }
   /* flood: ink on the flood colour. */
   .site-header[data-state='flood'] {
     color: var(--flood-fg);
@@ -184,7 +178,6 @@ const crumbStyle = (c: Crumb) =>
     min-width: 12rem;
     background: var(--color-bg);
     color: var(--color-fg);
-    text-shadow: none;
     border: 1px solid color-mix(in oklab, var(--color-fg) 14%, transparent);
     border-radius: 6px;
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
@@ -272,7 +265,7 @@ const crumbStyle = (c: Crumb) =>
   .links {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
+    gap: var(--grid);
     font-size: 0.95rem;
     flex-shrink: 0;
   }
@@ -294,7 +287,7 @@ const crumbStyle = (c: Crumb) =>
       display: none;
     }
     .links {
-      gap: var(--space-2);
+      gap: calc(var(--grid) * 2 / 3);
     }
   }
 </style>

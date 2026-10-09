@@ -14,7 +14,7 @@ Short rules for anyone (human or AI) building on this site. Full guidelines live
 - Category colour stays small (tags, lit dots, path segment, hover), one category per view, always paired with a label or glyph.
 
 ## Flood
-- One full-bleed hero per page, in that page's colour. Project pages flood in their category; home and about flood orange; index pages never flood.
+- One full-bleed hero per page, in that page's colour. Project pages flood in their category; home floods orange; index pages never flood. About is the exception: its hero is the dot portrait.
 - Everything on a flood is `--flood-fg` (ink): text, accent word, path, tags, marks. Resting marks at `--flood-mark-opacity`.
 - Live marker on a flood is an ink ring.
 

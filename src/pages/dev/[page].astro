@@ -21,7 +21,6 @@ const tones = [
 
 <Base
   title="components (dev)"
-  showTopo={false}
   breadcrumb={[{ label: 'dev', href: '/dev/components' }, { label: 'components' }]}
 >
   <FloodHero tone="brand" marks="dots">
@@ -78,7 +77,7 @@ const tones = [
   .pg-h2 { font-size: clamp(2rem, 4vw, 3rem); margin: 0; }
   .pg-h3 { font-size: clamp(2rem, 5vw, 4rem); margin: 0; }
   .pg-glyphs { display: flex; flex-wrap: wrap; gap: var(--grid) calc(var(--grid) * 2); }
-  .pg-glyph { display: flex; align-items: center; gap: var(--space-2); }
+  .pg-glyph { display: flex; align-items: center; gap: calc(var(--grid) * 2 / 3); }
   .pg-type-display { font-size: clamp(2.4rem, 6vw, 5rem); margin: 0; }
   .pg-body { max-width: 60ch; margin: 0; }
   :global(.pg-flood) { min-height: calc(var(--grid) * 12); }

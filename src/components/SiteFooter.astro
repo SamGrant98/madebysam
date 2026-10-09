@@ -1,10 +1,13 @@
 ---
-import { site } from '../data/site';
+import { site, profileLinks } from '../data/site';
 ---
 
 <footer class="site-footer">
   <span class="label">made by sam /</span>
-  <a href={`mailto:${site.email}`} class="label underline">{site.email}</a>
+  <span class="site-footer__links">
+    {profileLinks.map((l) => <a href={l.url} class="label underline">{l.label.toLowerCase()}</a>)}
+    <a href={`mailto:${site.email}`} class="label underline">{site.email}</a>
+  </span>
 </footer>
 
 <style>
@@ -16,5 +19,10 @@ import { site } from '../data/site';
     padding: calc(var(--grid) * 2) var(--page-margin) calc(var(--grid) * 3);
     border-top: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
     opacity: 0.8;
+  }
+  .site-footer__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--grid);
   }
 </style>

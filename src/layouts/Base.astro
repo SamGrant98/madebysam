@@ -1,13 +1,12 @@
 ---
 import { ClientRouter } from 'astro:transitions';
 import SiteHeader, { type Crumb } from '../components/SiteHeader.astro';
-import TopoCanvas from '../components/TopoCanvas.astro';
+import LitDots from '../components/LitDots.astro';
 import '../styles/global.css';
 
 interface Props {
   title?: string;
   description?: string;
-  showTopo?: boolean;
   // Breadcrumb path that trails after the brand mark, e.g.
   //   /lab          → [{ label: 'lab' }]
   //   /lab/dvd-shelf → [{ label: 'lab', href: '/lab' }, { label: 'play', category: 'play' }, { label: 'DVD Shelf' }]
@@ -23,7 +22,6 @@ interface Props {
 const {
   title = 'made by sam',
   description = 'Personal site & creative web experiments by Sam Grant.',
-  showTopo = true,
   breadcrumb = [],
   ogImage,
 } = Astro.props;
@@ -79,7 +77,7 @@ const resolvedOgImage = new URL(ogImage ?? '/og-default.png', Astro.site).href;
       })();
     </script>
 
-    {/* Client-side routing so the topo canvas, WebGL state, and mouse position persist between pages */}
+    {/* Client-side routing: smooth page changes, header and scripts persist */}
     <ClientRouter />
 
     {/* Outbound fade for cross-origin links (sibling subdomains).
@@ -113,7 +111,7 @@ const resolvedOgImage = new URL(ogImage ?? '/og-default.png', Astro.site).href;
     </script>
   </head>
   <body>
-    {showTopo && <TopoCanvas />}
+    <LitDots />
     <SiteHeader breadcrumb={breadcrumb} />
     {import.meta.env.DEV && (
       <script is:inline>
@@ -148,12 +146,5 @@ const resolvedOgImage = new URL(ogImage ?? '/og-default.png', Astro.site).href;
   @keyframes page-fade-in {
     from { opacity: 0; }
     to   { opacity: 1; }
-  }
-
-  /* Shared halo for readable text over the topo background */
-  main :where(h1, h2, h3, p) {
-    text-shadow:
-      0 0 10px var(--color-bg),
-      0 0 22px var(--color-bg);
   }
 </style>

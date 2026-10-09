@@ -1,0 +1,99 @@
+---
+// A small mono "spec sheet": label on the left, value on the right.
+// Used on project pages (category, status, stack, links) and on about
+// (role, based, stack). Rows with nothing in them are skipped, so pages
+// can pass optional data straight in.
+//
+//   <SpecPanel rows={[
+//     { label: 'category', category: 'play' },
+//     { label: 'status', value: 'live' },
+//     { label: 'stack', list: ['Three.js', 'TypeScript'] },
+//     { label: 'links', links: [{ label: 'dvd.madebysam.dev', url: 'https://...' }] },
+//   ]} />
+import Glyph from './Glyph.astro';
+import { CATEGORIES, type CategoryKey } from '../lib/categories';
+
+export interface SpecRow {
+  label: string;
+  value?: string | number;
+  list?: string[];
+  links?: { label: string; url: string }[];
+  category?: CategoryKey;
+}
+
+interface Props {
+  title?: string;
+  rows: SpecRow[];
+}
+
+const { title = 'Spec', rows } = Astro.props;
+const shown = rows.filter(
+  (r) => r.value !== undefined && r.value !== '' || r.list?.length || r.links?.length || r.category,
+);
+---
+
+<aside class="spec" aria-label={title}>
+  <div class="spec__head label">{title}</div>
+  <dl>
+    {shown.map((r) => (
+      <div class="spec__row">
+        <dt>{r.label}</dt>
+        {r.category ? (
+          <dd class="spec__cat" style={`--cat-text: ${CATEGORIES[r.category].textColor}`}>
+            <Glyph kind={CATEGORIES[r.category].glyph} size={12} /> {r.category}
+          </dd>
+        ) : r.list ? (
+          <dd><ul class="spec__list">{r.list.map((t) => <li>{t}</li>)}</ul></dd>
+        ) : r.links ? (
+          <dd><ul class="spec__list">{r.links.map((l) => <li><a href={l.url}>{l.label}</a></li>)}</ul></dd>
+        ) : (
+          <dd>{r.value}</dd>
+        )}
+      </div>
+    ))}
+  </dl>
+</aside>
+
+<style>
+  .spec {
+    border: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+    border-radius: 6px;
+    background: var(--color-bg); /* solid card over the dots */
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+  .spec__head {
+    padding: calc(var(--grid) / 2) calc(var(--grid) * 2 / 3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.6;
+  }
+  dl {
+    margin: 0;
+  }
+  .spec__row {
+    display: grid;
+    grid-template-columns: 6rem minmax(0, 1fr);
+    gap: calc(var(--grid) / 2);
+    padding: calc(var(--grid) / 2) calc(var(--grid) * 2 / 3);
+    border-top: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+  }
+  dt {
+    opacity: 0.55;
+  }
+  dd {
+    margin: 0;
+  }
+  .spec__cat {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    color: var(--cat-text);
+  }
+  .spec__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    line-height: 1.7;
+  }
+</style>

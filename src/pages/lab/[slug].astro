@@ -16,6 +16,7 @@ import FloodHero from '../../components/FloodHero.astro';
 import Glyph from '../../components/Glyph.astro';
 import GlyphField from '../../components/GlyphField.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
+import SpecPanel from '../../components/SpecPanel.astro';
 import { CATEGORIES } from '../../lib/categories';
 
 export async function getStaticPaths() {
@@ -58,7 +59,6 @@ const links = [
   title={`${data.title} / made by sam`}
   description={data.blurb}
   ogImage={ogImage}
-  showTopo={false}
   breadcrumb={[
     { label: 'lab', href: '/lab' },
     { label: data.category, category: data.category },
@@ -105,37 +105,16 @@ const links = [
         )}
       </div>
 
-      <aside class="spec" aria-label="Spec">
-        <div class="spec__head label">Spec</div>
-        <dl>
-          <div class="spec__row">
-            <dt>category</dt>
-            <dd class="spec__cat"><Glyph kind={cat.glyph} size={12} /> {data.category}</dd>
-          </div>
-          <div class="spec__row">
-            <dt>status</dt>
-            <dd>{data.status}</dd>
-          </div>
-          {data.year && (
-            <div class="spec__row"><dt>year</dt><dd>{data.year}</dd></div>
-          )}
-          {data.role && (
-            <div class="spec__row"><dt>role</dt><dd>{data.role}</dd></div>
-          )}
-          {data.stack.length > 0 && (
-            <div class="spec__row">
-              <dt>stack</dt>
-              <dd><ul class="spec__list">{data.stack.map((t) => <li>{t}</li>)}</ul></dd>
-            </div>
-          )}
-          {links.length > 0 && (
-            <div class="spec__row">
-              <dt>links</dt>
-              <dd><ul class="spec__list">{links.map((l) => <li><a href={l.url}>{l.label}</a></li>)}</ul></dd>
-            </div>
-          )}
-        </dl>
-      </aside>
+      <div class="demo__spec">
+        <SpecPanel rows={[
+          { label: 'category', category: data.category },
+          { label: 'status', value: data.status },
+          { label: 'year', value: data.year },
+          { label: 'role', value: data.role },
+          { label: 'stack', list: data.stack },
+          { label: 'links', links },
+        ]} />
+      </div>
     </section>
 
     <section class="notes" data-path="notes">
@@ -252,47 +231,8 @@ const links = [
     }
   }
 
-  .spec {
+  .demo__spec {
     flex: 1 1 18rem;
-    border: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
-    border-radius: 6px;
-    background: var(--color-bg); /* solid card over the dots */
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-  }
-  .spec__head {
-    padding: calc(var(--grid) / 2) calc(var(--grid) * 2 / 3);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    opacity: 0.6;
-  }
-  .spec dl {
-    margin: 0;
-  }
-  .spec__row {
-    display: grid;
-    grid-template-columns: 6rem minmax(0, 1fr);
-    gap: calc(var(--grid) / 2);
-    padding: calc(var(--grid) / 2) calc(var(--grid) * 2 / 3);
-    border-top: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
-  }
-  .spec dt {
-    opacity: 0.55;
-  }
-  .spec dd {
-    margin: 0;
-  }
-  .spec__cat {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5em;
-    color: var(--cat-text);
-  }
-  .spec__list {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    line-height: 1.7;
   }
 
   /* ---- Notes (the markdown body) ---- */

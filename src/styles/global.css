@@ -36,7 +36,6 @@
   /* grid: everything snaps to 24px, measured from the PAGE's top-left.
      Dots sit on the lines (0, 24, 48…), so edges set in whole cells
      land on a dot column. */
-  --space-unit: 8px;
   --dot-spacing: 24px;
   --dot-size: 1.5px;
   --grid: var(--dot-spacing);
@@ -49,27 +48,16 @@
   --flood-fg: var(--ink);
   --flood-mark-opacity: 0.2;
 
-  /* legacy names, kept as aliases while components migrate */
+  /* theme: what components read. Light here, flipped under [data-theme='dark']. */
   --color-bg: var(--paper);
   --color-fg: var(--ink);
-  --color-muted: #5C5B57;
-  --color-accent: var(--orange); /* legacy: old pages only, remove once they're rebuilt */
-  --font-sans: var(--font-body);
 
-  --space-1: 0.5rem;
-  --space-2: 1rem;
-  --space-3: 1.5rem;
-  --space-4: 2rem;
-  --space-6: 3rem;
-  --space-8: 4rem;
-  --radius: 0.5rem;
   --transition: 0.2s ease;
 }
 
 :root[data-theme='dark'] {
   --color-bg: var(--ink);
   --color-fg: var(--paper);
-  --color-muted: #9C9B97;
 
   /* on ink, text uses the signal colour directly */
   --orange-text: var(--orange);
@@ -143,7 +131,7 @@ body {
   background-size: var(--grid) var(--grid);
   background-position: calc(var(--grid) / -2) calc(var(--grid) / -2);
   color: var(--color-fg);
-  font-family: var(--font-sans);
+  font-family: var(--font-body);
   font-size: 16px;
   line-height: 1.6;
   min-height: 100vh;

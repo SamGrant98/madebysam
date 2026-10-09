@@ -91,7 +91,7 @@ const hasMeta = Astro.slots.has('meta') || live;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-1) var(--space-3);
+    gap: calc(var(--grid) / 3) var(--grid);
   }
 
   .flood__live {
@@ -114,10 +114,5 @@ const hasMeta = Astro.slots.has('meta') || live;
      orange flood and is weak on yellow. On any flood it becomes ink. */
   .flood :global(:focus-visible) {
     outline-color: var(--flood-fg);
-  }
-  /* Base.astro gives headings a bg-coloured glow so they read over the
-     topo lines. A flood has no topo behind it, so switch the glow off. */
-  .flood :global(:where(h1, h2, h3, p)) {
-    text-shadow: none;
   }
 </style>

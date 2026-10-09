@@ -58,7 +58,7 @@ const byCategory = Object.fromEntries(
         const cat = CATEGORIES[k];
         const made = byCategory[k];
         return (
-          <li class="play__item" style={`--cat-text: ${cat.textColor}`}>
+          <li class="play__item" data-accent={k} style={`--cat-text: ${cat.textColor}`}>
             <Glyph kind={cat.glyph} size={24} />
             <strong class="play__name">{cat.label}</strong>
             <span class="play__desc">{a.play[k]}</span>

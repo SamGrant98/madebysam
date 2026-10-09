@@ -61,7 +61,6 @@ const Stage = href ? 'a' : 'div';
   const REACH = 260; // px around the pointer that react
   const PUSH = 56; // px: how far dots get shoved at the pointer itself
   const SWIRL = 0.4; // sideways twist, as a share of the push
-  const BIG = 720; // px: above this width, 'dots' mode uses the 24px grid
   const GLYPH_AT = 0.3; // dots this close to the pointer (0..1) turn into glyphs
   const GLYPHS = ['bar', 'chevron', 'plus', 'square'];
 
@@ -163,8 +162,7 @@ const Stage = href ? 'a' : 'div';
 
     function draw() {
       if (!map || !w) return;
-      // Big portraits stay coarse: same dot count, bigger dots, not more detail.
-      const pitch = mode === 'dots' && w > BIG ? 24 : PITCH[mode];
+      const pitch = PITCH[mode];
       // Colours from the tokens (not `color`, which fades with the theme).
       const cs = getComputedStyle(root);
       const fg = rgb(cs.getPropertyValue('--color-fg'));
@@ -235,7 +233,7 @@ const Stage = href ? 'a' : 'div';
             const s = (pitch / 24) * (1.6 + 2.4 * t) * (1 + 0.6 * k);
             drawGlyph(ctx, kind, x + dx, y + dy, s);
           } else {
-            const radius = Math.max(1.4, t * pitch * 0.56) * (1 + 0.6 * k);
+            const radius = Math.max(1.2, t * pitch * 0.5) * (1 + 0.6 * k);
             ctx.beginPath();
             ctx.arc(x + dx, y + dy, radius, 0, Math.PI * 2);
             ctx.fill();

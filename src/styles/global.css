@@ -252,15 +252,18 @@ pre {
   font-family: var(--font-mono);
 }
 
-/* Page colour: brand orange, or the category on project pages (set by
-   Base via <html data-accent>). Used for text selection and the lit dots. */
+/* Accent colour: brand orange by default. data-accent sets a category's
+   colour for everything inside it: on <html> for a whole project page
+   (Base), or on a single card, node or chip. Text selection uses it, and
+   the lit dots use the page-level one. */
 :root {
   --page-accent: var(--orange);
 }
-html[data-accent='sound'] { --page-accent: var(--cat-sound); }
-html[data-accent='movement'] { --page-accent: var(--cat-movement); }
-html[data-accent='space'] { --page-accent: var(--cat-space); }
-html[data-accent='play'] { --page-accent: var(--cat-play); }
+[data-accent='sound'] { --page-accent: var(--cat-sound); }
+[data-accent='movement'] { --page-accent: var(--cat-movement); }
+[data-accent='space'] { --page-accent: var(--cat-space); }
+[data-accent='play'] { --page-accent: var(--cat-play); }
+[data-accent='brand'] { --page-accent: var(--orange); }
 
 ::selection {
   background: var(--page-accent);

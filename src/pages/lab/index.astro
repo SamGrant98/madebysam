@@ -66,6 +66,7 @@ const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
           <a
             href={`/lab/${entry.id}`}
             class:list={['node', `node--${d.status}`]}
+            data-accent={d.category}
             data-node={entry.id}
             data-x={d.mapPosition.x}
             data-y={d.mapPosition.y}
@@ -89,6 +90,7 @@ const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
         return (
           <div
             class="card"
+            data-accent={d.category}
             data-card-for={entry.id}
             style={`--cat-text: ${cat.textColor}`}
             hidden

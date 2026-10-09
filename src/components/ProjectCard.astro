@@ -19,6 +19,7 @@ const cat = CATEGORIES[d.category];
 <a
   href={`/lab/${entry.id}`}
   class="card"
+  data-accent={d.category}
   style={`--cat: ${cat.color}; --cat-text: ${cat.textColor}`}
 >
   <div class="card__media">

@@ -49,7 +49,7 @@ const selected = (await getCollection('lab'))
     <div class="instruments__side">
       <ul class="chips" aria-label="Categories">
         {CATEGORY_KEYS.map((key) => (
-          <li class="chip" style={`color: ${CATEGORIES[key].textColor}`}>
+          <li class="chip" data-accent={key} style={`color: ${CATEGORIES[key].textColor}`}>
             <Glyph kind={CATEGORIES[key].glyph} size={12} />
             {key}
           </li>

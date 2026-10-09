@@ -15,7 +15,8 @@
 //   tilt    on phones: Android straight away; iOS asks permission on the
 //           first tap on empty page space (Safari only allows that request
 //           from a tap)
-// Reduced motion: the light snaps to the pointer, no easing, no tilt.
+// Click / tap: a ripple ring spreads out from the point and fades.
+// Reduced motion: the light snaps to the pointer, no easing, no tilt, no ripple.
 ---
 
 <canvas class="lit" aria-hidden="true" transition:persist="lit-dots"></canvas>
@@ -37,6 +38,10 @@
   const GRID = 24;
   const RADIUS = 144; // px: how far the light reaches (6 cells)
   const EASE = 0.18; // how quickly the light catches up with its target
+  // Click ripple: a ring that grows out from a click or tap.
+  const RIPPLE_SPEED = 0.7; // px per ms
+  const RIPPLE_LIFE = 900; // ms
+  const RIPPLE_BAND = 28; // px: how thick the ring is
 
   type Flood = { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; kind: string };
 
@@ -115,17 +120,47 @@
       }
     }
 
+    // ---- Ripples ----
+    // Stored in PAGE coordinates so they stay put if the page scrolls.
+    type Ripple = { x: number; y: number; t0: number };
+    let ripples: Ripple[] = [];
+    let now = 0;
+
+    // Visit every grid point on a ripple's ring. k fades with distance from
+    // the ring's edge and with the ripple's age.
+    function eachRipplePoint(fn: (x: number, y: number, k: number) => void) {
+      const sx = scrollX, sy = scrollY;
+      for (const rp of ripples) {
+        const age = (now - rp.t0) / RIPPLE_LIFE;
+        if (age >= 1) continue;
+        const radius = (now - rp.t0) * RIPPLE_SPEED;
+        const fade = 1 - age;
+        const cx = rp.x - sx, cy = rp.y - sy; // ring centre on screen
+        const reach = radius + RIPPLE_BAND;
+        const x0 = Math.ceil((cx + sx - reach) / GRID) * GRID - sx;
+        const y0 = Math.ceil((cy + sy - reach) / GRID) * GRID - sy;
+        for (let y = y0; y <= cy + reach; y += GRID) {
+          if (y < -GRID || y > h + GRID) continue;
+          for (let x = x0; x <= cx + reach; x += GRID) {
+            const off = Math.abs(Math.hypot(x - cx, y - cy) - radius) / RIPPLE_BAND;
+            if (off < 1) fn(x, y, (1 - off) * fade);
+          }
+        }
+      }
+    }
+
     function drawPaper() {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
-      if (level < 0.01) return;
       ctx.fillStyle = accent;
-      eachLitPoint((x, y, k) => {
+      const dot = (x: number, y: number, k: number) => {
         ctx.globalAlpha = k;
         ctx.beginPath();
         ctx.arc(x, y, 1.5 + 2 * k, 0, Math.PI * 2);
         ctx.fill();
-      });
+      };
+      if (level >= 0.01) eachLitPoint(dot);
+      eachRipplePoint(dot);
       ctx.globalAlpha = 1;
     }
 
@@ -138,16 +173,22 @@
         const c = f.ctx;
         c.setTransform(dpr, 0, 0, dpr, 0, 0);
         c.clearRect(0, 0, r.width, r.height);
-        // Skip floods the light can't reach (most of the time, all of them).
-        if (level < 0.01 || light.x < r.left - RADIUS || light.x > r.right + RADIUS ||
-            light.y < r.top - RADIUS || light.y > r.bottom + RADIUS) continue;
+        // Skip floods off screen, and ones the light can't reach when
+        // there's no ripple running (most of the time, all of them).
+        if (r.bottom < 0 || r.top > h) continue;
+        const lightHere = level >= 0.01 && light.x > r.left - RADIUS && light.x < r.right + RADIUS &&
+          light.y > r.top - RADIUS && light.y < r.bottom + RADIUS;
+        if (!lightHere && ripples.length === 0) continue;
         c.fillStyle = fg;
         c.strokeStyle = fg;
         const grow = f.kind === 'dot' ? 1.2 : 0.5;
-        eachLitPoint((x, y, k) => {
+        const mark = (x: number, y: number, k: number) => {
+          if (y < r.top - GRID || y > r.bottom + GRID) return;
           c.globalAlpha = k;
           glyph(c, f.kind, x - r.left, y - r.top, 1 + grow * k);
-        });
+        };
+        if (lightHere) eachLitPoint(mark);
+        eachRipplePoint(mark);
         c.globalAlpha = 1;
       }
     }
@@ -155,6 +196,8 @@
     // Animate until the light has caught up, then stop (no idle loop).
     function step() {
       raf = 0;
+      now = performance.now();
+      ripples = ripples.filter((rp) => now - rp.t0 < RIPPLE_LIFE);
       const t = reduce ? 1 : EASE;
       light.x += (target.x - light.x) * t;
       light.y += (target.y - light.y) * t;
@@ -164,7 +207,8 @@
       const moving =
         Math.abs(target.x - light.x) > 0.5 ||
         Math.abs(target.y - light.y) > 0.5 ||
-        Math.abs(targetLevel - level) > 0.01;
+        Math.abs(targetLevel - level) > 0.01 ||
+        ripples.length > 0;
       if (moving) raf = requestAnimationFrame(step);
     }
     function kick() {
@@ -185,6 +229,11 @@
     }, { passive: true });
     addEventListener('pointerdown', (e) => {
       clearTimeout(fadeTimer);
+      // A ripple per click / tap (not with reduced motion). Max 4 at once.
+      if (!reduce) {
+        ripples.push({ x: e.clientX + scrollX, y: e.clientY + scrollY, t0: performance.now() });
+        if (ripples.length > 4) ripples.shift();
+      }
       aim(e.clientX, e.clientY, e.pointerType === 'touch');
     }, { passive: true });
     addEventListener('pointerup', (e) => {

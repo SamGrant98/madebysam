@@ -42,7 +42,11 @@ const resolvedOgImage = new URL(ogImage ?? '/og-default.png', Astro.site).href;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalUrl} />
+    {/* Halftone S: SVG for modern browsers, .ico fallback, PNG for phone home screens */}
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#FF6601" />
     {/* Preload the two Switzer weights used above the fold */}
     <link rel="preload" href="/fonts/switzer/Switzer-Regular.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/switzer/Switzer-Black.woff2" as="font" type="font/woff2" crossorigin />

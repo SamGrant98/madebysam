@@ -60,10 +60,10 @@ const shown = rows.filter(
     border-radius: 6px;
     background: var(--color-bg); /* solid card over the dots */
     font-family: var(--font-mono);
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
   }
   .spec__head {
-    padding: calc(var(--grid) / 2) calc(var(--grid) * 2 / 3);
+    padding: calc(var(--grid) / 3) calc(var(--grid) / 2);
     text-transform: uppercase;
     letter-spacing: 0.08em;
     opacity: 0.6;
@@ -73,9 +73,9 @@ const shown = rows.filter(
   }
   .spec__row {
     display: grid;
-    grid-template-columns: 6rem minmax(0, 1fr);
+    grid-template-columns: 5rem minmax(0, 1fr);
     gap: calc(var(--grid) / 2);
-    padding: calc(var(--grid) / 2) calc(var(--grid) * 2 / 3);
+    padding: calc(var(--grid) / 3) calc(var(--grid) / 2);
     border-top: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
   }
   dt {
@@ -94,6 +94,7 @@ const shown = rows.filter(
     margin: 0;
     padding: 0;
     list-style: none;
-    line-height: 1.7;
+    line-height: 1.5;
   }
+
 </style>

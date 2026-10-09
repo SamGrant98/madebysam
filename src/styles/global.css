@@ -230,7 +230,7 @@ h3 {
   min-height: 44px;
   padding: 0 var(--grid);
   border-radius: 999px;
-  background: var(--orange);
+  background: var(--page-accent); /* orange, or the category it sits in */
   color: var(--ink);
   font-weight: 700;
   text-decoration: none;

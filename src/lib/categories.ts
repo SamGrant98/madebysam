@@ -22,6 +22,8 @@ export interface CategoryInfo {
   textColor: string;
   /** What belongs here, for the about page and for deciding new projects. */
   covers: string;
+  /** Default label for a project's main button (a project can set its own `action`). */
+  verb: string;
 }
 
 export const CATEGORIES: Record<CategoryKey, CategoryInfo> = {
@@ -31,6 +33,7 @@ export const CATEGORIES: Record<CategoryKey, CategoryInfo> = {
     color: 'var(--cat-sound)',
     textColor: 'var(--cat-sound-text)',
     covers: 'DJing, AV, audio-reactive work, music tools',
+    verb: 'Listen',
   },
   movement: {
     label: 'Movement',
@@ -38,6 +41,7 @@ export const CATEGORIES: Record<CategoryKey, CategoryInfo> = {
     color: 'var(--cat-movement)',
     textColor: 'var(--cat-movement-text)',
     covers: 'Sport tech, cognitive training, body tracking',
+    verb: 'Try',
   },
   space: {
     label: 'Space',
@@ -45,6 +49,7 @@ export const CATEGORIES: Record<CategoryKey, CategoryInfo> = {
     color: 'var(--cat-space)',
     textColor: 'var(--cat-space-text)',
     covers: 'VR, web AR, installations: work where the space is the point',
+    verb: 'Explore',
   },
   play: {
     label: 'Play',
@@ -52,6 +57,7 @@ export const CATEGORIES: Record<CategoryKey, CategoryInfo> = {
     color: 'var(--cat-play)',
     textColor: 'var(--cat-play-text)',
     covers: 'Games, toys, small tools',
+    verb: 'Play',
   },
 };
 

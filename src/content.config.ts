@@ -37,6 +37,9 @@ const lab = defineCollection({
       repo: z.string().url().optional(),
       next: z.string().optional(), // what's next / what I learned
       href: z.string().url().optional(),
+      // Label for the main button. Defaults to the category's verb
+      // (Play, Listen, Explore, Try) from src/lib/categories.ts.
+      action: z.string().optional(),
       stack: z.array(z.string()).default([]),
       inspiration: z.string().optional(),
       // Hero image — shown large at the top of the detail page

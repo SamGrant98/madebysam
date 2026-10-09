@@ -40,6 +40,8 @@ const { Content } = await render(entry);
 const data = entry.data;
 const cat = CATEGORIES[data.category];
 const nextCat = CATEGORIES[next.data.category];
+// The main button's label: the project's own, or the category's verb.
+const action = data.action ?? cat.verb;
 
 // 1200x630 PNG of the screenshot for the OG card (PNG because some crawlers
 // still skip webp). No screenshot: Base falls back to /og-default.png.
@@ -53,6 +55,15 @@ const links = [
   data.href && { label: host(data.href), url: data.href },
   data.repo && { label: 'source', url: data.repo },
 ].filter(Boolean) as { label: string; url: string }[];
+// Spec rows: shown on the hero image (laptops) or beside the gallery (wide).
+const specRows = [
+  { label: 'category', category: data.category },
+  { label: 'status', value: data.status },
+  { label: 'year', value: data.year },
+  { label: 'role', value: data.role },
+  { label: 'stack', list: data.stack },
+  { label: 'links', links },
+];
 ---
 
 <Base
@@ -66,59 +77,58 @@ const links = [
     { label: entry.id },
   ]}
 >
-  <article style={`--cat: ${cat.color}; --cat-text: ${cat.textColor}`}>
-    <FloodHero tone={data.category} live={data.status === 'live'}>
-      <span slot="eyebrow" class="eyebrow"><Glyph kind={cat.glyph} size={12} /> {cat.label}</span>
-      <h1 class="display title">{data.title}</h1>
-      <p class="blurb">{data.blurb}</p>
-      {data.status !== 'live' && (
-        <Fragment slot="meta"><span class="flood-tag">{data.status}</span></Fragment>
-      )}
-    </FloodHero>
-
-    <section class="demo" data-path="demo">
-      <div class="demo__main">
-      <div class="demo__stage">
-        {data.demo ? (
-          <iframe
-            src={data.demo}
-            title={`${data.title}, live demo`}
-            loading="lazy"
-            allow="autoplay; fullscreen; microphone; xr-spatial-tracking"
-          ></iframe>
-        ) : data.screenshot ? (
-          <Image
-            src={data.screenshot}
-            alt={`${data.title}, screenshot`}
-            widths={[640, 1024, 1600]}
-            sizes="(min-width: 1025px) 66vw, 100vw"
-            loading="eager"
-          />
-        ) : (
-          <>
-            <GlyphField kind={cat.glyph} color="var(--cat-text)" opacity={0.5} />
-            <span class="demo__empty label">{data.status}, nothing to play yet</span>
-          </>
+  <article class="project" style={`--cat: ${cat.color}; --cat-text: ${cat.textColor}`}>
+    <div class="hero">
+      <FloodHero tone={data.category} live={data.status === 'live'} class="hero__flood">
+        <span slot="eyebrow" class="eyebrow"><Glyph kind={cat.glyph} size={12} /> {cat.label}</span>
+        <h1 class="display title">{data.title}</h1>
+        <p class="blurb">{data.blurb}</p>
+        {data.status !== 'live' && (
+          <Fragment slot="meta"><span class="flood-tag">{data.status}</span></Fragment>
         )}
-      </div>
+      </FloodHero>
+
+      {/* The thing itself: sits across the bottom edge of the flood, with
+          the spec card pinned over its bottom-right corner (desktop). */}
+      <div class="stage-wrap">
+        <div class="demo__stage">
+          {data.demo ? (
+            <iframe
+              src={data.demo}
+              title={`${data.title}, live demo`}
+              loading="lazy"
+              allow="autoplay; fullscreen; microphone; xr-spatial-tracking"
+            ></iframe>
+          ) : data.screenshot ? (
+            <Image
+              src={data.screenshot}
+              alt={`${data.title}, screenshot`}
+              widths={[640, 1024, 1600]}
+              sizes="(min-width: 1025px) 52vw, 100vw"
+              loading="eager"
+            />
+          ) : (
+            <>
+              <GlyphField kind={cat.glyph} color="var(--cat-text)" opacity={0.5} />
+              <span class="demo__empty label">{data.status}, nothing to play yet</span>
+            </>
+          )}
+        </div>
         {data.href && (
-          <a class="button demo__open" href={data.href}>Open {host(data.href)}</a>
+          <a class="button demo__open" href={data.href} aria-label={`${action} ${data.title} at ${host(data.href)}`}>{action}</a>
         )}
+        <div class="stage-spec">
+          <SpecPanel rows={specRows} />
+        </div>
       </div>
-
-      <div class="demo__spec">
-        <SpecPanel rows={[
-          { label: 'category', category: data.category },
-          { label: 'status', value: data.status },
-          { label: 'year', value: data.year },
-          { label: 'role', value: data.role },
-          { label: 'stack', list: data.stack },
-          { label: 'links', links },
-        ]} />
-      </div>
-    </section>
+    </div>
 
     <section class="notes" data-path="notes">
+      {/* Desktop only: invisible floats the size of the stage and spec
+          overhang, so the notes start right under the flood on the left
+          and wrap around the image, then use the full width below it. */}
+      <div class="notes__dodge notes__dodge--stage" aria-hidden="true"></div>
+      <div class="notes__dodge notes__dodge--spec" aria-hidden="true"></div>
       <Content />
     </section>
 
@@ -126,7 +136,7 @@ const links = [
       <section class="gallery" data-path="gallery" aria-label="More images">
         {data.gallery.map((g) => (
           <figure>
-            <Image src={g.src} alt={g.alt ?? ''} widths={[640, 1024, 1600]} sizes="100vw" />
+            <Image src={g.src} alt={g.alt ?? ''} widths={[640, 1024, 1600]} sizes="(min-width: 1600px) 56vw, 100vw" />
             {g.caption && <figcaption class="label">{g.caption}</figcaption>}
           </figure>
         ))}
@@ -156,6 +166,30 @@ const links = [
   <SiteFooter />
 </Base>
 
+<script>
+  // Measure how far the spec card hangs below the image, so the notes'
+  // invisible spacer is exactly that tall (CSS can't know the card's height).
+  let ro: ResizeObserver | null = null;
+  function measure() {
+    const stage = document.querySelector<HTMLElement>('.demo__stage');
+    const spec = document.querySelector<HTMLElement>('.stage-spec');
+    const dodge = document.querySelector<HTMLElement>('.notes__dodge--spec');
+    if (!stage || !spec || !dodge) return;
+    const overhang = spec.getBoundingClientRect().bottom - stage.getBoundingClientRect().bottom;
+    dodge.style.setProperty('--spec-overhang', `${Math.max(0, overhang) + 24}px`);
+  }
+  document.addEventListener('astro:page-load', () => {
+    ro?.disconnect();
+    const spec = document.querySelector('.stage-spec');
+    if (!spec) return;
+    ro = new ResizeObserver(measure);
+    ro.observe(spec);
+    ro.observe(document.body);
+    measure();
+  });
+  document.addEventListener('astro:before-swap', () => { ro?.disconnect(); ro = null; });
+</script>
+
 <style>
   /* Same rule as the home page: whole cells for padding and gaps, page
      margin at the sides, so every edge lands on a dot column. */
@@ -178,35 +212,40 @@ const links = [
     max-width: 36ch;
   }
 
-  /* ---- Demo + spec ---- */
-  .demo {
-    padding: calc(var(--grid) * 2) var(--page-margin);
-    display: flex;
-    flex-wrap: wrap;
-    gap: calc(var(--grid) * 2);
-    align-items: flex-start;
+  /* ---- Hero + stage ----
+     Three layouts:
+       phone     (< 641px)   title, then the image across the flood's edge,
+                             button and spec stacked under it
+       stacked   (641-1599)  title, then the image full width across the
+                             edge, spec card pinned to its bottom-right
+       side      (1600+)     title left, image right across the edge, spec
+                             pinned under its lower right, notes up beside it
+     --stage-w / --stage-h are the image's size (16:9). They live on the
+     article so the notes (which dodge the image) can read them too. */
+  .project {
+    --stage-w: calc(100vw - var(--page-margin) * 2);
+    --stage-h: calc(var(--stage-w) * 9 / 16);
+    --stage-up: 0.6; /* share of the image that sits on the flood */
   }
-  /* Stage + Open button. The button overlaps the stage's bottom-left corner
-     on wider screens, and drops below it on phones so it doesn't hide the
-     screenshot. */
-  .demo__main {
-    flex: 999 1 36rem;
-    min-width: 0;
+  .stage-wrap {
     position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--grid);
+    z-index: 2; /* above the flood */
+    width: var(--stage-w);
+    margin: calc(var(--stage-h) * var(--stage-up) * -1) var(--page-margin) 0;
+  }
+  /* Room at the bottom of the flood for the part of the image on it. */
+  .hero :global(.hero__flood .flood__content) {
+    padding-bottom: calc(var(--grid) * 3 + var(--stage-h) * var(--stage-up));
   }
   .demo__stage {
-    width: 100%;
     position: relative;
     isolation: isolate;
     aspect-ratio: 16 / 9;
     border-radius: 6px;
     overflow: hidden;
     border: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
-    background: color-mix(in oklab, var(--color-fg) 4%, var(--color-bg));
+    background: var(--color-bg);
+    box-shadow: 0 16px 48px rgb(0 0 0 / 0.25);
   }
   .demo__stage :global(img),
   .demo__stage iframe {
@@ -227,37 +266,123 @@ const links = [
     left: var(--grid);
     bottom: var(--grid);
   }
+  .stage-spec {
+    margin-top: var(--grid);
+  }
+  .notes__dodge {
+    display: none;
+  }
+
   @media (max-width: 640px) {
+    /* the button drops below the image so it doesn't cover it */
     .demo__open {
       position: static;
+      margin-top: var(--grid);
     }
   }
 
-  .demo__spec {
-    flex: 1 1 18rem;
+  /* Stacked and side: the spec card is pinned to the image, and an
+     invisible float in the notes keeps text clear of its overhang. */
+  @media (min-width: 641px) {
+    .project {
+      --spec-right: var(--grid);
+    }
+    .stage-spec {
+      position: absolute;
+      top: 100%;
+      right: var(--spec-right);
+      width: 16rem;
+      margin: 0;
+      translate: 0 calc(var(--grid) * -2); /* 2 cells up over the image */
+      box-shadow: 0 12px 32px rgb(0 0 0 / 0.2);
+      border-radius: 6px;
+    }
+    .notes__dodge {
+      display: block;
+      float: right;
+      clear: right;
+    }
+    .notes__dodge--spec {
+      width: calc(16rem + var(--spec-right) + var(--grid) * 2);
+      /* how far the spec card hangs below the image, measured by the
+         script below; 10rem until it runs */
+      height: var(--spec-overhang, 10rem);
+    }
+  }
+
+  /* Laptops (stacked layout): title on the left, description and tag
+     beside it on the right, so the title block is one row and the image
+     starts close underneath it. */
+  @media (min-width: 1025px) and (max-width: 1599px) {
+    .hero :global(.hero__flood .flood__content) {
+      display: grid;
+      grid-template-columns: minmax(0, auto) minmax(18rem, 1fr);
+      grid-template-areas:
+        'eyebrow eyebrow'
+        'title   blurb'
+        'title   meta';
+      column-gap: calc(var(--grid) * 4);
+      row-gap: calc(var(--grid) / 2);
+      max-width: none;
+    }
+    .hero :global(.flood__eyebrow) { grid-area: eyebrow; }
+    .title { grid-area: title; align-self: end; }
+    .blurb { grid-area: blurb; align-self: end; }
+    .hero :global(.flood__meta) { grid-area: meta; align-self: start; }
+  }
+
+  /* Side by side: big screens only. */
+  @media (min-width: 1600px) {
+    .project {
+      --stage-w: clamp(28rem, 56vw, 90rem);
+      --stage-h: calc(var(--stage-w) * 9 / 16);
+      --stage-up: 0.72;
+      --spec-right: calc(var(--stage-w) * 0.12); /* in from the image's edge */
+    }
+    /* The flood is exactly as tall as the image needs, and the title
+       starts level with the image's top: no empty band above it. */
+    .hero :global(.hero__flood) {
+      min-height: calc(var(--stage-h) * var(--stage-up) + var(--header-h) + var(--grid) * 4);
+      justify-content: flex-start;
+    }
+    .hero :global(.hero__flood .flood__content) {
+      padding-top: calc(var(--header-h) + var(--grid) * 4);
+      padding-bottom: calc(var(--grid) * 3);
+      max-width: calc(100% - var(--stage-w) - var(--grid) * 2);
+    }
+    .stage-wrap {
+      margin: calc(var(--stage-h) * var(--stage-up) * -1) var(--page-margin)
+        calc(var(--stage-h) * (1 - var(--stage-up)) * -1) auto;
+    }
+    .notes__dodge--stage {
+      width: calc(var(--stage-w) + var(--grid) * 2);
+      height: calc(var(--stage-h) * (1 - var(--stage-up)) - var(--grid) * 2);
+    }
   }
 
   /* ---- Notes (the markdown body) ---- */
   .notes {
     counter-reset: note;
     padding: calc(var(--grid) * 2) var(--page-margin) calc(var(--grid) * 3);
-    border-top: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
-    display: flex;
-    flex-direction: column;
-    gap: var(--grid);
+    display: flow-root; /* contains the dodge floats */
   }
-  /* Limit the line length on the children, not the section, so the
-     divider above still runs the full width. */
-  .notes > :global(*) {
+  /* Limit the line length on the text, not the section. */
+  .notes > :global(:not(.notes__dodge)) {
     max-width: 62ch;
+    margin: 0;
+  }
+  .notes > :global(:not(.notes__dodge) + :not(.notes__dodge)) {
+    margin-top: var(--grid);
   }
   .notes :global(h2) {
     counter-increment: note;
-    margin: var(--grid) 0 0;
     font-weight: var(--display-weight);
     letter-spacing: var(--display-tracking);
     font-size: clamp(1.75rem, 3vw, 2.25rem);
     line-height: 1.05;
+  }
+  .notes > :global(h2:not(:first-of-type)) {
+    margin-top: calc(var(--grid) * 2);
   }
   /* 01, 02, 03 in the accent face, in the category's colour. */
   .notes :global(h2)::before {
@@ -272,7 +397,6 @@ const links = [
     color: var(--cat-text);
   }
   .notes :global(p) {
-    margin: 0;
     font-size: 1.0625rem;
     line-height: 1.6;
     opacity: 0.88;
@@ -283,9 +407,12 @@ const links = [
   }
 
   /* ---- Gallery ---- */
+  /* Gallery images are the same width as the hero image (--stage-w);
+     more images sit side by side when there's room. */
   .gallery {
     padding: 0 var(--page-margin) calc(var(--grid) * 3);
     display: grid;
+    grid-template-columns: repeat(auto-fill, min(100%, var(--stage-w)));
     gap: calc(var(--grid) * 2);
   }
   .gallery figure {

@@ -1,221 +1,408 @@
 ---
+// One lab project ("instrument") page.
+//
+//   1. FloodHero in the project's category colour, with its glyph field.
+//   2. Demo + Spec: the thing itself first (live embed, screenshot, or a
+//      glyph placeholder), with a spec panel beside it.
+//   3. Notes: the markdown body. Each ## heading is numbered 01, 02... in
+//      Melodrama, in the category's text colour.
+//   4. Gallery, if the entry has one.
+//   5. Prev/next: back to the lab, and the next project in the same category
+//      (or the next one overall if it's alone in its category).
 import { getCollection, render } from 'astro:content';
 import { Image, getImage } from 'astro:assets';
 import Base from '../../layouts/Base.astro';
+import FloodHero from '../../components/FloodHero.astro';
+import Glyph from '../../components/Glyph.astro';
+import GlyphField from '../../components/GlyphField.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
 import { CATEGORIES } from '../../lib/categories';
 
 export async function getStaticPaths() {
-  const entries = await getCollection('lab');
-  return entries.map((entry) => ({
-    params: { slug: entry.id },
-    props: { entry },
-  }));
+  const entries = (await getCollection('lab')).sort((a, b) => a.data.order - b.data.order);
+
+  return entries.map((entry) => {
+    // "Next" stays inside the category when it can, wrapping round at the end.
+    const sameCat = entries.filter((e) => e.data.category === entry.data.category);
+    const pool = sameCat.length > 1 ? sameCat : entries;
+    const i = pool.findIndex((e) => e.id === entry.id);
+    const next = pool[(i + 1) % pool.length];
+    return {
+      params: { slug: entry.id },
+      props: { entry, next, nextInCategory: sameCat.length > 1 },
+    };
+  });
 }
 
-const { entry } = Astro.props;
+const { entry, next, nextInCategory } = Astro.props;
 const { Content } = await render(entry);
 const data = entry.data;
+const cat = CATEGORIES[data.category];
+const nextCat = CATEGORIES[next.data.category];
 
-// Generate a 1200×630 PNG version of the screenshot for the OG card.
-// PNG (not avif/webp) because some social crawlers — notably LinkedIn and
-// older Slack — still don't render webp previews reliably. If no screenshot
-// is set, Base falls back to /og-default.png.
+// 1200x630 PNG of the screenshot for the OG card (PNG because some crawlers
+// still skip webp). No screenshot: Base falls back to /og-default.png.
 const ogImage = data.screenshot
   ? (await getImage({ src: data.screenshot, format: 'png', width: 1200, height: 630, fit: 'cover' })).src
   : undefined;
 
+// Spec rows: only the ones the entry actually has.
+const host = (url: string) => new URL(url).host.replace(/^www\./, '');
+const links = [
+  data.href && { label: host(data.href), url: data.href },
+  data.repo && { label: 'source', url: data.repo },
+].filter(Boolean) as { label: string; url: string }[];
 ---
 
 <Base
-  title={`${data.title} — made by sam`}
+  title={`${data.title} / made by sam`}
   description={data.blurb}
   ogImage={ogImage}
+  showTopo={false}
   breadcrumb={[
     { label: 'lab', href: '/lab' },
     { label: data.category, category: data.category },
-    { label: entry.id }, // the slug: paths show the real location, e.g. dvd-shelf
+    { label: entry.id },
   ]}
 >
-  <article class="demo">
-    <header class="demo__header">
-      <h1>{data.title}</h1>
-      <p class="lede">{data.blurb}</p>
-      <div class="demo__meta">
-        <span class="meta-item">{CATEGORIES[data.category].label}</span>
-        <span class={`meta-item status status--${data.status}`}>{data.status}</span>
+  <article style={`--cat: ${cat.color}; --cat-text: ${cat.textColor}`}>
+    <FloodHero tone={data.category} live={data.status === 'live'}>
+      <span slot="eyebrow" class="eyebrow"><Glyph kind={cat.glyph} size={12} /> {cat.label}</span>
+      <h1 class="display title">{data.title}</h1>
+      <p class="blurb">{data.blurb}</p>
+      {data.status !== 'live' && (
+        <Fragment slot="meta"><span class="flood-tag">{data.status}</span></Fragment>
+      )}
+    </FloodHero>
+
+    <section class="demo" data-path="demo">
+      <div class="demo__main">
+      <div class="demo__stage">
+        {data.demo ? (
+          <iframe
+            src={data.demo}
+            title={`${data.title}, live demo`}
+            loading="lazy"
+            allow="autoplay; fullscreen; microphone; xr-spatial-tracking"
+          ></iframe>
+        ) : data.screenshot ? (
+          <Image
+            src={data.screenshot}
+            alt={`${data.title}, screenshot`}
+            widths={[640, 1024, 1600]}
+            sizes="(min-width: 1025px) 66vw, 100vw"
+            loading="eager"
+          />
+        ) : (
+          <>
+            <GlyphField kind={cat.glyph} color="var(--cat-text)" opacity={0.5} />
+            <span class="demo__empty label">{data.status}, nothing to play yet</span>
+          </>
+        )}
       </div>
-    </header>
+        {data.href && (
+          <a class="button demo__open" href={data.href}>Open {host(data.href)}</a>
+        )}
+      </div>
 
-    {data.screenshot && (
-      <figure class="demo__screenshot">
-        <Image src={data.screenshot} alt={`${data.title} hero`} loading="eager" />
-      </figure>
-    )}
+      <aside class="spec" aria-label="Spec">
+        <div class="spec__head label">Spec</div>
+        <dl>
+          <div class="spec__row">
+            <dt>category</dt>
+            <dd class="spec__cat"><Glyph kind={cat.glyph} size={12} /> {data.category}</dd>
+          </div>
+          <div class="spec__row">
+            <dt>status</dt>
+            <dd>{data.status}</dd>
+          </div>
+          {data.year && (
+            <div class="spec__row"><dt>year</dt><dd>{data.year}</dd></div>
+          )}
+          {data.role && (
+            <div class="spec__row"><dt>role</dt><dd>{data.role}</dd></div>
+          )}
+          {data.stack.length > 0 && (
+            <div class="spec__row">
+              <dt>stack</dt>
+              <dd><ul class="spec__list">{data.stack.map((t) => <li>{t}</li>)}</ul></dd>
+            </div>
+          )}
+          {links.length > 0 && (
+            <div class="spec__row">
+              <dt>links</dt>
+              <dd><ul class="spec__list">{links.map((l) => <li><a href={l.url}>{l.label}</a></li>)}</ul></dd>
+            </div>
+          )}
+        </dl>
+      </aside>
+    </section>
 
-    {data.stack.length > 0 && (
-      <section class="demo__stack" aria-label="Stack">
-        {data.stack.map((tech) => <span class="chip">{tech}</span>)}
-      </section>
-    )}
-
-    <div class="demo__body">
+    <section class="notes" data-path="notes">
       <Content />
-    </div>
+    </section>
 
     {data.gallery.length > 0 && (
-      <section class="demo__gallery" aria-label="More images">
+      <section class="gallery" data-path="gallery" aria-label="More images">
         {data.gallery.map((g) => (
           <figure>
-            <Image src={g.src} alt={g.alt ?? ''} loading="lazy" />
-            {g.caption && <figcaption>{g.caption}</figcaption>}
+            <Image src={g.src} alt={g.alt ?? ''} widths={[640, 1024, 1600]} sizes="100vw" />
+            {g.caption && <figcaption class="label">{g.caption}</figcaption>}
           </figure>
         ))}
       </section>
     )}
 
-    {data.href && (
-      <a class="demo__cta" href={data.href}>
-        View live <span aria-hidden="true">→</span>
+    <nav class="pager" aria-label="More in the lab">
+      <a href="/lab" class="pager__link">
+        <span class="label pager__kicker">back to</span>
+        <span class="pager__title">Lab</span>
       </a>
-    )}
+      <a
+        href={`/lab/${next.id}`}
+        class="pager__link pager__link--next"
+        style={`--next-text: ${nextCat.textColor}`}
+      >
+        <span class="label pager__kicker">
+          <Glyph kind={nextCat.glyph} size={12} />
+          {nextInCategory ? `next in ${next.data.category}` : 'next'}
+        </span>
+        <span class="pager__title">{next.data.title}</span>
+      </a>
+    </nav>
   </article>
+
+  <SiteFooter />
 </Base>
 
 <style>
-  .demo {
-    max-width: 44rem;
-    margin: 0 auto;
-    padding: calc(var(--space-8) * 1.5) var(--space-4) var(--space-8);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-5);
-  }
+  /* Same rule as the home page: whole cells for padding and gaps, page
+     margin at the sides, so every edge lands on a dot column. */
 
-  .demo__header {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-  .demo__header h1 {
-    font-size: clamp(2rem, 5vw, 3rem);
-  }
-  .lede {
-    font-size: 1.15rem;
-    color: var(--color-fg);
-    opacity: 0.85;
-    max-width: 38rem;
-  }
-
-  .demo__meta {
-    display: flex;
-    gap: var(--space-2);
-    margin-top: var(--space-1);
-  }
-  .meta-item {
-    font-size: 0.72rem;
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    opacity: 0.7;
   }
-  .status--live { color: var(--color-accent); opacity: 1; }
-  .status--sketching,
-  .status--parked { opacity: 0.55; }
-
-  .demo__screenshot {
+  .title {
     margin: 0;
-    border-radius: var(--radius);
-    overflow: hidden;
-    border: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+    font-size: clamp(3rem, 9vw, 7.5rem);
+    line-height: 0.92;
   }
-  .demo__screenshot img {
-    display: block;
-    width: 100%;
-    height: auto;
-  }
-
-  .demo__gallery {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-    gap: var(--space-3);
-  }
-  .demo__gallery figure {
+  .blurb {
     margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-  }
-  .demo__gallery img {
-    display: block;
-    width: 100%;
-    height: auto;
-    border-radius: var(--radius);
-    border: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
-  }
-  .demo__gallery figcaption {
-    font-size: 0.78rem;
-    opacity: 0.6;
-    line-height: 1.4;
+    font-size: clamp(1.125rem, 1.8vw, 1.375rem);
+    max-width: 36ch;
   }
 
-  .demo__stack {
+  /* ---- Demo + spec ---- */
+  .demo {
+    padding: calc(var(--grid) * 2) var(--page-margin);
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: calc(var(--grid) * 2);
+    align-items: flex-start;
   }
-  .chip {
-    font-size: 0.75rem;
-    padding: 4px 10px;
-    border: 1px solid color-mix(in oklab, var(--color-accent) 40%, transparent);
-    border-radius: 999px;
-    color: var(--color-accent);
-    opacity: 0.9;
-  }
-
-  /* Rendered markdown body */
-  .demo__body {
+  /* Stage + Open button. The button overlaps the stage's bottom-left corner
+     on wider screens, and drops below it on phones so it doesn't hide the
+     screenshot. */
+  .demo__main {
+    flex: 999 1 36rem;
+    min-width: 0;
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
-    line-height: 1.65;
-    color: var(--color-fg);
+    align-items: flex-start;
+    gap: var(--grid);
   }
-  .demo__body :global(h2) {
-    font-size: 1.25rem;
-    margin-top: var(--space-3);
-    font-weight: 500;
+  .demo__stage {
+    width: 100%;
+    position: relative;
+    isolation: isolate;
+    aspect-ratio: 16 / 9;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+    background: color-mix(in oklab, var(--color-fg) 4%, var(--color-bg));
   }
-  .demo__body :global(p) {
-    opacity: 0.88;
+  .demo__stage :global(img),
+  .demo__stage iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border: 0;
   }
-  .demo__body :global(em) {
-    opacity: 0.55;
-    font-style: italic;
+  .demo__empty {
+    position: absolute;
+    left: var(--grid);
+    bottom: var(--grid);
+    opacity: 0.7;
   }
-  .demo__body :global(a) {
-    color: var(--color-accent);
-    text-decoration: underline;
-    text-underline-offset: 3px;
+  .demo__open {
+    position: absolute;
+    left: var(--grid);
+    bottom: var(--grid);
+  }
+  @media (max-width: 640px) {
+    .demo__open {
+      position: static;
+    }
   }
 
-  .demo__cta {
-    align-self: flex-start;
-    margin-top: var(--space-3);
-    padding: 10px 18px;
-    border-radius: var(--radius);
-    border: 1px solid var(--color-accent);
-    color: var(--color-accent);
+  .spec {
+    flex: 1 1 18rem;
+    border: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+    border-radius: 6px;
+    background: var(--color-bg); /* solid card over the dots */
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+  .spec__head {
+    padding: calc(var(--grid) / 2) calc(var(--grid) * 2 / 3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.6;
+  }
+  .spec dl {
+    margin: 0;
+  }
+  .spec__row {
+    display: grid;
+    grid-template-columns: 6rem minmax(0, 1fr);
+    gap: calc(var(--grid) / 2);
+    padding: calc(var(--grid) / 2) calc(var(--grid) * 2 / 3);
+    border-top: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+  }
+  .spec dt {
+    opacity: 0.55;
+  }
+  .spec dd {
+    margin: 0;
+  }
+  .spec__cat {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    color: var(--cat-text);
+  }
+  .spec__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    line-height: 1.7;
+  }
+
+  /* ---- Notes (the markdown body) ---- */
+  .notes {
+    counter-reset: note;
+    padding: calc(var(--grid) * 2) var(--page-margin) calc(var(--grid) * 3);
+    border-top: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+    display: flex;
+    flex-direction: column;
+    gap: var(--grid);
+  }
+  /* Limit the line length on the children, not the section, so the
+     divider above still runs the full width. */
+  .notes > :global(*) {
+    max-width: 62ch;
+  }
+  .notes :global(h2) {
+    counter-increment: note;
+    margin: var(--grid) 0 0;
+    font-weight: var(--display-weight);
+    letter-spacing: var(--display-tracking);
+    font-size: clamp(1.75rem, 3vw, 2.25rem);
+    line-height: 1.05;
+  }
+  /* 01, 02, 03 in the accent face, in the category's colour. */
+  .notes :global(h2)::before {
+    content: counter(note, decimal-leading-zero);
+    display: block;
+    margin-bottom: calc(var(--grid) / 2);
+    font-family: var(--font-accent);
+    font-weight: var(--accent-weight);
+    letter-spacing: 0;
+    font-size: 1.6em;
+    line-height: 1;
+    color: var(--cat-text);
+  }
+  .notes :global(p) {
+    margin: 0;
+    font-size: 1.0625rem;
+    line-height: 1.6;
+    opacity: 0.88;
+  }
+  /* _[Sam: ...]_ placeholders render as <em>: keep them visibly unfinished. */
+  .notes :global(em) {
+    opacity: 0.55;
+  }
+
+  /* ---- Gallery ---- */
+  .gallery {
+    padding: 0 var(--page-margin) calc(var(--grid) * 3);
+    display: grid;
+    gap: calc(var(--grid) * 2);
+  }
+  .gallery figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--grid) / 2);
+  }
+  .gallery :global(img) {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 6px;
+    border: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+  }
+  .gallery figcaption {
+    opacity: 0.6;
+    max-width: 70ch;
+  }
+
+  /* ---- Prev / next ---- */
+  .pager {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-top: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+  }
+  .pager__link {
+    min-height: calc(var(--grid) * 4);
+    padding: var(--grid) var(--page-margin);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: calc(var(--grid) / 4);
+    color: inherit;
     text-decoration: none;
-    font-weight: 500;
-    transition: background var(--transition), color var(--transition);
   }
-  .demo__cta:hover {
-    background: var(--color-accent);
-    color: var(--color-bg);
+  .pager__link + .pager__link {
+    border-left: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
   }
-  .demo__cta span {
-    display: inline-block;
-    transition: transform var(--transition);
-    margin-left: 4px;
+  .pager__link--next {
+    align-items: flex-end;
+    text-align: right;
   }
-  .demo__cta:hover span { transform: translateX(3px); }
+  .pager__kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    opacity: 0.6;
+  }
+  .pager__link--next .pager__kicker {
+    color: var(--next-text);
+    opacity: 1;
+  }
+  .pager__title {
+    font-weight: 700;
+    font-size: clamp(1.25rem, 2vw, 1.5rem);
+    letter-spacing: -0.02em;
+  }
+  .pager__link:hover .pager__title {
+    color: var(--orange-text);
+  }
 </style>

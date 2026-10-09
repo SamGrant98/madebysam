@@ -29,46 +29,7 @@
     initTopoCanvas(canvas);
   }
 
-  // Topo↔grid morph is now tied to the LAB SECTION, not just /lab. Detail
-  // pages at /lab/{slug} also keep the grid so case studies feel like part
-  // of the lab, not a return to the home topo.
-  function cleanPath(u: URL | undefined | null): string {
-    if (!u) return '/';
-    return (u.pathname ?? '').replace(/\/+$/, '') || '/';
-  }
-  function isLabSection(path: string): boolean {
-    return path === '/lab' || path.startsWith('/lab/');
-  }
-
-  // Drives the morph based on whichever section the current page is in.
-  function syncTopoMode() {
-    const path = cleanPath(new URL(window.location.href));
-    if (isLabSection(path)) {
-      window.__topo?.setMorph(1, 1000);
-    } else {
-      window.__topo?.setMorph(0, 700);
-    }
-  }
-  document.addEventListener('astro:page-load', () => {
-    document.body.classList.remove('lab-leaving');
-    syncTopoMode();
-  });
-  syncTopoMode();
-
-  // Exit-morph: only triggers when LEAVING the lab section entirely. Going
-  // /lab → /lab/dvd-shelf is NOT an exit, so the grid stays put.
-  document.addEventListener('astro:before-preparation', (e: any) => {
-    const from = cleanPath(e?.from);
-    const to = cleanPath(e?.to);
-    if (isLabSection(from) && !isLabSection(to)) {
-      document.body.classList.add('lab-leaving');
-      window.__topo?.setMorph(0, 700);
-      const orig = e.loader;
-      e.loader = async () => {
-        // Hold the swap so DOM fade + most of the morph play on-screen.
-        await new Promise((r) => setTimeout(r, 550));
-        await orig();
-      };
-    }
-  });
+  // The old topo-to-grid morph on /lab routes is gone: the lab and project
+  // pages now sit on the CSS dot grid with no canvas. setMorph() still
+  // exists in topo.ts if we want it back.
 </script>

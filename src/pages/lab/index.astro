@@ -1,19 +1,24 @@
 ---
-import Base from '../../layouts/Base.astro';
-import { CATEGORIES } from '../../lib/categories';
+// The lab: every project, as a floating map or a list.
+//
+// Map: each project is a node (its category glyph in a 44px circle) placed
+// from its `mapPosition`, snapped to the page's dot grid, then drifting a
+// little around that dot. Lines join related projects. On touch screens the
+// first tap opens a small card with an Open button; on desktop the node is
+// just a link. List: the same ProjectCards as the home page.
+//
+// No flood here (BRAND.md: index pages never flood).
 import { getCollection } from 'astro:content';
+import Base from '../../layouts/Base.astro';
+import Glyph from '../../components/Glyph.astro';
+import ProjectCard from '../../components/ProjectCard.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import { CATEGORIES } from '../../lib/categories';
 
-// Pull lab entries from the content collection. Each entry's frontmatter
-// supplies title, blurb, status, mapPosition, drift — the same data that
-// used to be a hardcoded array. Single source of truth shared with the
-// detail page at /lab/[slug].
-const labEntries = (await getCollection('lab')).sort(
-  (a, b) => a.data.order - b.data.order,
-);
+const entries = (await getCollection('lab')).sort((a, b) => a.data.order - b.data.order);
 
-
-// Pre-compute initial edge coords (in viewBox 0..100 units = percent of viewport).
-// Connections are still defined here since they aren't a per-demo property.
+// Which projects are joined by a line. Not a per-project property, so it
+// lives here.
 const connections: [string, string][] = [
   ['dvd-shelf', 'topo-playground'],
   ['dvd-shelf', 'palette-generator'],
@@ -21,312 +26,491 @@ const connections: [string, string][] = [
   ['palette-generator', 'audio-reactive'],
   ['topo-playground', 'palette-generator'],
 ];
-
-const entryById = Object.fromEntries(labEntries.map((e) => [e.id, e]));
-const edges = connections.map(([aId, bId], i) => {
-  const a = entryById[aId];
-  const b = entryById[bId];
-  return {
-    a: aId,
-    b: bId,
-    i,
-    x1: a.data.mapPosition.x * 100,
-    y1: a.data.mapPosition.y * 100,
-    x2: b.data.mapPosition.x * 100,
-    y2: b.data.mapPosition.y * 100,
-  };
-});
-
-const driftData = {
-  nodes: labEntries.map((e) => ({
-    id: e.id,
-    x: e.data.mapPosition.x * 100,
-    y: e.data.mapPosition.y * 100,
-    ...e.data.drift,
-  })),
-  edges: connections.map(([a, b]) => ({ a, b })),
-};
+const byId = Object.fromEntries(entries.map((e) => [e.id, e]));
+const edges = connections.filter(([a, b]) => byId[a] && byId[b]);
+const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
 ---
 
-<Base title="lab — made by sam" breadcrumb={[{ label: 'lab' }]}>
-  <section class="lab-intro">
-    <h1>Lab</h1>
-    <p>A place to play. Experiments from the Obsidian vault, in public.</p>
-  </section>
+<Base title="lab / made by sam" breadcrumb={[{ label: 'lab' }]} showTopo={false}>
+  <div class="lab" data-lab data-view="map">
+    <section class="intro">
+      <h1 class="display intro__title">Lab</h1>
+      <p class="intro__lede">A place to play. Experiments from the Obsidian vault, in public.</p>
+      <div class="intro__controls">
+        <div class="toggle" role="group" aria-label="View">
+          <button type="button" class="toggle__btn label" data-view-btn="map" aria-pressed="true">map</button>
+          <button type="button" class="toggle__btn label" data-view-btn="list" aria-pressed="false">list</button>
+        </div>
+        <span class="label intro__count">{entries.length} projects</span>
+      </div>
+    </section>
 
-  <svg class="lab-edges" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-    {edges.map((e) => (
-      <line
-        class="edge"
-        data-edge-a={e.a}
-        data-edge-b={e.b}
-        style={`--edge-i: ${e.i}`}
-        x1={e.x1}
-        y1={e.y1}
-        x2={e.x2}
-        y2={e.y2}
-        vector-effect="non-scaling-stroke"
-      />
-    ))}
-  </svg>
+    <section class="map" data-map aria-label="Lab map">
+      <svg class="map__edges" aria-hidden="true">
+        {edges.map(([a, b]) => (
+          <line
+            data-edge
+            data-a={a}
+            data-b={b}
+            x1={pct(byId[a].data.mapPosition.x)}
+            y1={pct(byId[a].data.mapPosition.y)}
+            x2={pct(byId[b].data.mapPosition.x)}
+            y2={pct(byId[b].data.mapPosition.y)}
+          />
+        ))}
+      </svg>
 
-  <div class="lab-map" aria-label="Experiments map">
-    {labEntries.map((entry, idx) => {
-      const { data } = entry;
-      const cls = `node node--${data.status}`;
-      const style = `--node-x: ${data.mapPosition.x * 100}%; --node-y: ${data.mapPosition.y * 100}%; --node-i: ${idx};`;
-      return (
-        <a class={cls} data-node-id={entry.id} style={style} href={`/lab/${entry.id}`}>
-          <span class="node__dot" aria-hidden="true" />
-          <div class="node__label">
-            <span class="node__title">{data.title}</span>
-            <span class="node__meta">
-              <span>{CATEGORIES[data.category].label}</span>
-              {data.status !== 'live' && <span class="node__status">{data.status}</span>}
+      {entries.map((entry) => {
+        const d = entry.data;
+        const cat = CATEGORIES[d.category];
+        return (
+          <a
+            href={`/lab/${entry.id}`}
+            class:list={['node', `node--${d.status}`]}
+            data-node={entry.id}
+            data-x={d.mapPosition.x}
+            data-y={d.mapPosition.y}
+            data-drift={JSON.stringify(d.drift)}
+            style={`--x: ${pct(d.mapPosition.x)}; --y: ${pct(d.mapPosition.y)}; --cat: ${cat.color}; --cat-text: ${cat.textColor}`}
+            aria-label={`${d.title}, ${d.category}, ${d.status}`}
+          >
+            <span class="node__mark"><Glyph kind={cat.glyph} size={20} /></span>
+            <span class="node__label" aria-hidden="true">
+              <span class="node__title">{d.title}</span>
+              {d.status !== 'live' && <span class="node__status label">{d.status}</span>}
             </span>
+          </a>
+        );
+      })}
+
+      {/* One card per project, hidden until its node is tapped (touch only). */}
+      {entries.map((entry) => {
+        const d = entry.data;
+        const cat = CATEGORIES[d.category];
+        return (
+          <div
+            class="card"
+            data-card-for={entry.id}
+            style={`--cat-text: ${cat.textColor}`}
+            hidden
+          >
+            <span class="card__meta label">
+              <Glyph kind={cat.glyph} size={12} /> {d.category} · {d.status}
+            </span>
+            <strong class="card__title">{d.title}</strong>
+            <span class="card__blurb">{d.blurb}</span>
+            <a class="button card__open" href={`/lab/${entry.id}`}>Open</a>
           </div>
-        </a>
-      );
-    })}
+        );
+      })}
+    </section>
+
+    <section class="list" aria-label="All projects">
+      {entries.map((entry) => <ProjectCard entry={entry} />)}
+    </section>
   </div>
+
+  <SiteFooter />
 </Base>
 
-<script define:vars={{ driftData }}>
-  // ---- Morph: topo → grid on enter ----
-  function applyMorph() {
-    const path = window.location.pathname.replace(/\/+$/, '') || '/';
-    if (path !== '/lab') return;
-    if (!window.__topo) return;
-    window.__topo.setMorph(1, 1000);
-  }
-  document.addEventListener('astro:page-load', applyMorph);
-  applyMorph();
+<script>
+  // Bundled script: runs once, then re-inits on every visit via
+  // astro:page-load, and tears down on astro:before-swap (same pattern as
+  // SiteHeader).
+  const GRID = 24; // keep in step with --grid
+  const DRIFT_PX = 8; // drift amplitude per unit of `amp` in the frontmatter
 
-  // ---- Floating network animation ----
-  let rafId = 0;
-  let cancelled = false;
+  type Drift = { ampX: number; ampY: number; freqX: number; freqY: number; phaseX: number; phaseY: number };
+  type Node = { el: HTMLElement; id: string; x: number; y: number; d: Drift; bx: number; by: number; cx: number; cy: number };
 
-  function startDrift() {
-    const nodes = driftData.nodes.map((n) => ({
-      ...n,
-      el: document.querySelector(`[data-node-id="${n.id}"]`),
-      cx: n.x,
-      cy: n.y,
-    }));
-    if (nodes.some((n) => !n.el)) return;
-    const nodeById = Object.fromEntries(nodes.map((n) => [n.id, n]));
+  let cleanup: (() => void) | null = null;
 
-    const edgeEls = Array.from(document.querySelectorAll('line.edge')).map((line) => ({
-      line,
-      a: nodeById[line.getAttribute('data-edge-a')],
-      b: nodeById[line.getAttribute('data-edge-b')],
-    })).filter((e) => e.a && e.b);
+  function init() {
+    cleanup?.();
+    cleanup = null;
+    const root = document.querySelector<HTMLElement>('[data-lab]');
+    const map = root?.querySelector<HTMLElement>('[data-map]');
+    if (!root || !map) return;
 
-    const t0 = performance.now();
-    function tick() {
-      if (cancelled) return;
-      const t = (performance.now() - t0) / 1000;
-      for (const n of nodes) {
-        n.cx = n.x + n.ampX * Math.sin(t * n.freqX + n.phaseX);
-        n.cy = n.y + n.ampY * Math.sin(t * n.freqY + n.phaseY);
-        n.el.style.setProperty('--node-x', n.cx + '%');
-        n.el.style.setProperty('--node-y', n.cy + '%');
-      }
-      for (const e of edgeEls) {
-        e.line.setAttribute('x1', e.a.cx);
-        e.line.setAttribute('y1', e.a.cy);
-        e.line.setAttribute('x2', e.b.cx);
-        e.line.setAttribute('y2', e.b.cy);
-      }
-      rafId = requestAnimationFrame(tick);
+    const ac = new AbortController();
+    const { signal } = ac;
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const touch = matchMedia('(hover: none)').matches;
+
+    // ---- Map / list toggle (remembered per browser) ----
+    const buttons = root.querySelectorAll<HTMLButtonElement>('[data-view-btn]');
+    function setView(v: string) {
+      root!.dataset.view = v;
+      buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.viewBtn === v)));
+      try { localStorage.setItem('lab-view', v); } catch {}
+      if (v === 'map') layout();
     }
-    tick();
+    buttons.forEach((b) => b.addEventListener('click', () => setView(b.dataset.viewBtn!), { signal }));
+
+    // ---- Nodes and edges ----
+    const nodes: Node[] = [...map.querySelectorAll<HTMLElement>('[data-node]')].map((el) => ({
+      el,
+      id: el.dataset.node!,
+      x: Number(el.dataset.x),
+      y: Number(el.dataset.y),
+      d: JSON.parse(el.dataset.drift!),
+      bx: 0, by: 0, cx: 0, cy: 0,
+    }));
+    const byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
+    const edges = [...map.querySelectorAll<SVGLineElement>('[data-edge]')]
+      .map((line) => ({ line, a: byId[line.dataset.a!], b: byId[line.dataset.b!] }))
+      .filter((e) => e.a && e.b);
+
+    // From here on, JS places the nodes in pixels (CSS % positions are only
+    // the no-JS fallback).
+    map.classList.add('is-live');
+
+    // Base position, in three steps:
+    //   1. Stretch: mapPosition values only matter relative to each other,
+    //      so the group is stretched to fill the map (whatever its shape).
+    //   2. Pad: keep room at the edges for the labels under each node.
+    //   3. Snap to the nearest dot on the PAGE grid (dots sit on multiples
+    //      of 24 from the page's top-left).
+    const range = (vals: number[]) => {
+      const lo = Math.min(...vals), hi = Math.max(...vals);
+      return { lo, span: hi - lo || 1 };
+    };
+    const rx = range(nodes.map((n) => n.x));
+    const ry = range(nodes.map((n) => n.y));
+
+    let w = 0, h = 0;
+    function layout() {
+      const r = map!.getBoundingClientRect();
+      if (!r.width) return;
+      w = r.width; h = r.height;
+      const left = r.left + scrollX;
+      const top = r.top + scrollY;
+      const padX = Math.max(GRID * 4, w * 0.12); // half a label each side
+      const padTop = GRID * 3;
+      const padBottom = GRID * 5; // the label hangs below the node
+      const snap = (v: number) => Math.round(v / GRID) * GRID;
+      for (const n of nodes) {
+        const fx = (n.x - rx.lo) / rx.span;
+        const fy = (n.y - ry.lo) / ry.span;
+        n.bx = snap(left + padX + fx * (w - padX * 2)) - left;
+        n.by = snap(top + padTop + fy * (h - padTop - padBottom)) - top;
+      }
+      draw(performance.now());
+    }
+
+    // ---- Tap card (touch screens) ----
+    const cards = Object.fromEntries(
+      [...map.querySelectorAll<HTMLElement>('[data-card-for]')].map((c) => [c.dataset.cardFor!, c]),
+    );
+    let selected: Node | null = null;
+    function select(n: Node | null) {
+      if (selected) {
+        cards[selected.id].hidden = true;
+        selected.el.classList.remove('is-selected');
+      }
+      selected = n;
+      if (n) {
+        cards[n.id].hidden = false;
+        n.el.classList.add('is-selected');
+        placeCard();
+      }
+    }
+    function placeCard() {
+      if (!selected) return;
+      const card = cards[selected.id];
+      const cw = card.offsetWidth, ch = card.offsetHeight;
+      const x = Math.min(Math.max(selected.cx - cw / 2, GRID), w - cw - GRID);
+      // Below the node if it fits, otherwise above.
+      const below = selected.cy + GRID * 1.5;
+      const y = below + ch < h ? below : selected.cy - GRID * 1.5 - ch;
+      card.style.transform = `translate(${x}px, ${y}px)`;
+    }
+
+    map.addEventListener('click', (e) => {
+      const target = e.target as Element;
+      const nodeEl = target.closest<HTMLElement>('[data-node]');
+      if (nodeEl && touch) {
+        const n = byId[nodeEl.dataset.node!];
+        if (selected !== n) {
+          e.preventDefault(); // first tap opens the card, the card's button navigates
+          select(n);
+        }
+        return;
+      }
+      if (!target.closest('[data-card-for]')) select(null);
+    }, { signal });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') select(null); }, { signal });
+
+    // ---- Drift ----
+    function draw(now: number) {
+      const t = now / 1000;
+      const amp = reduceMotion ? 0 : DRIFT_PX;
+      for (const n of nodes) {
+        n.cx = n.bx + amp * n.d.ampX * Math.sin(t * n.d.freqX + n.d.phaseX);
+        n.cy = n.by + amp * n.d.ampY * Math.sin(t * n.d.freqY + n.d.phaseY);
+        n.el.style.transform = `translate(${n.cx}px, ${n.cy}px)`;
+      }
+      for (const e of edges) {
+        e.line.setAttribute('x1', String(e.a.cx));
+        e.line.setAttribute('y1', String(e.a.cy));
+        e.line.setAttribute('x2', String(e.b.cx));
+        e.line.setAttribute('y2', String(e.b.cy));
+      }
+      placeCard();
+    }
+
+    let raf = 0;
+    function loop(now: number) {
+      if (root!.dataset.view === 'map') draw(now);
+      raf = requestAnimationFrame(loop);
+    }
+
+    let saved = 'map';
+    try { saved = localStorage.getItem('lab-view') ?? 'map'; } catch {}
+    setView(saved === 'list' ? 'list' : 'map');
+
+    const ro = new ResizeObserver(layout);
+    ro.observe(map);
+    document.fonts?.ready.then(layout);
+    if (!reduceMotion) raf = requestAnimationFrame(loop);
+
+    cleanup = () => {
+      ac.abort();
+      ro.disconnect();
+      cancelAnimationFrame(raf);
+    };
   }
 
-  function stopDrift() {
-    cancelled = true;
-    if (rafId) cancelAnimationFrame(rafId);
-  }
-
-  function boot() {
-    cancelled = false;
-    startDrift();
-  }
-  document.addEventListener('astro:page-load', () => {
-    const path = window.location.pathname.replace(/\/+$/, '') || '/';
-    if (path === '/lab') boot();
-    else stopDrift();
+  document.addEventListener('astro:page-load', init);
+  document.addEventListener('astro:before-swap', () => {
+    cleanup?.();
+    cleanup = null;
   });
-  document.addEventListener('astro:before-preparation', stopDrift);
-  boot();
 </script>
 
 <style>
-  .lab-intro {
-    position: fixed;
-    top: var(--space-8);
-    left: 50%;
-    transform: translateX(-50%);
-    text-align: center;
-    z-index: 3;
-    pointer-events: none;
-    opacity: 0;
-    animation: lab-intro-in 0.6s ease-out forwards;
-    animation-delay: 0.55s;
+  /* ---- Intro ---- */
+  .intro {
+    padding: calc(var(--header-h) + var(--grid) * 2) var(--page-margin) calc(var(--grid) * 2);
+    display: flex;
+    flex-direction: column;
+    gap: var(--grid);
   }
-  @keyframes lab-intro-in {
-    from { opacity: 0; transform: translate(-50%, -8px); }
-    to   { opacity: 1; transform: translate(-50%, 0); }
+  .intro__title {
+    margin: 0;
+    font-size: clamp(3.5rem, 10vw, 8rem);
+    line-height: 0.92;
   }
-  .lab-intro h1 {
-    font-size: clamp(2rem, 5vw, 3rem);
-    margin-bottom: var(--space-1);
+  .intro__lede {
+    margin: 0;
+    font-size: clamp(1.125rem, 1.8vw, 1.375rem);
+    max-width: 36ch;
+    opacity: 0.75;
   }
-  .lab-intro p {
-    color: var(--color-fg);
-    opacity: 0.7;
-    font-size: 0.95rem;
+  .intro__controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--grid);
+  }
+  .intro__count {
+    opacity: 0.55;
   }
 
-  .lab-edges {
-    position: fixed;
+  .toggle {
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid color-mix(in oklab, var(--color-fg) 14%, transparent);
+    border-radius: 999px;
+    background: var(--color-bg);
+  }
+  .toggle__btn {
+    min-height: 40px;
+    padding: 0 calc(var(--grid) * 2 / 3);
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    color: inherit;
+    opacity: 0.6;
+    cursor: pointer;
+  }
+  .toggle__btn[aria-pressed='true'] {
+    background: var(--color-fg);
+    color: var(--color-bg);
+    opacity: 1;
+  }
+
+  /* Only one view at a time. */
+  .lab[data-view='map'] .list,
+  .lab[data-view='list'] .map {
+    display: none;
+  }
+
+  /* ---- Map ---- */
+  .map {
+    position: relative;
+    overflow: hidden;
+    border-top: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+    /* Whole cells tall, so the footer below starts on a grid line. */
+    height: max(36rem, 72svh);
+    height: round(down, max(36rem, 72svh), var(--grid));
+  }
+  @media (max-width: 640px) {
+    /* Portrait: positions stretch down a taller map. */
+    .map {
+      height: 110svh;
+      height: round(down, 110svh, var(--grid));
+    }
+  }
+
+  .map__edges {
+    position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
-    z-index: 1;
     pointer-events: none;
     overflow: visible;
   }
-  .edge {
+  .map__edges line {
     stroke: var(--color-fg);
-    stroke-width: 1.2;
-    stroke-linecap: round;
-    stroke-opacity: 0;
-    animation: edge-in 0.55s ease-out forwards;
-    animation-delay: calc(0.4s + var(--edge-i) * 0.08s);
-  }
-  @keyframes edge-in {
-    from { stroke-opacity: 0; }
-    to   { stroke-opacity: 0.35; }
+    stroke-opacity: 0.22;
+    stroke-width: 1;
   }
 
-  .lab-map {
-    position: fixed;
-    inset: 0;
-    z-index: 2;
-    pointer-events: none;
-  }
-
-  /* Dot is the first child (14px tall); translate so ITS centre lands on
-     the anchor coords so SVG edges connect dot-to-dot. */
   .node {
     position: absolute;
-    left: var(--node-x, 50%);
-    top: var(--node-y, 50%);
-    transform: translate(-50%, -7px);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-2);
+    /* No-JS fallback: percentage position. JS switches to pixels. */
+    left: var(--x);
+    top: var(--y);
+    /* The 44px mark is centred on the point; the label hangs below it. */
+    margin: -22px 0 0 -22px;
     color: inherit;
     text-decoration: none;
-    pointer-events: auto;
-    cursor: pointer;
-    opacity: 0;
-    animation: node-in 0.55s ease-out forwards;
-    animation-delay: calc(0.7s + var(--node-i) * 0.08s);
   }
-  .node--sketching,
-  .node--parked { animation-name: node-in-dim; }
-  @keyframes node-in {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-  }
-  @keyframes node-in-dim {
-    from { opacity: 0; }
-    to   { opacity: 0.65; }
+  .map.is-live .node {
+    left: 0;
+    top: 0;
   }
 
-  :global(body.lab-leaving) .edge,
-  :global(body.lab-leaving) .node,
-  :global(body.lab-leaving) .lab-intro {
-    animation: none;
-    transition: opacity 0.35s ease-out;
-    opacity: 0;
-  }
-  :global(body.lab-leaving) .edge {
-    transition: stroke-opacity 0.35s ease-out;
-    stroke-opacity: 0;
-  }
-
-  .node__dot {
-    width: 14px;
-    height: 14px;
+  .node__mark {
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    background: var(--color-fg);
+    display: grid;
+    place-items: center;
+    color: var(--cat-text);
+    background: var(--color-bg);
+    /* thin ring, then a paper-coloured moat so lines stop short of it */
     box-shadow:
-      0 0 0 5px var(--color-bg),
-      0 0 18px var(--color-bg);
-    transition: transform var(--transition), background var(--transition), box-shadow var(--transition);
+      0 0 0 1px color-mix(in oklab, var(--color-fg) 16%, transparent),
+      0 0 0 6px var(--color-bg);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
   }
-  /* Live demos get the accent — visually distinguishes "shipped + clickable
-     to live" from "still cooking" without needing an extra label. */
-  .node--live .node__dot {
-    background: var(--color-accent);
+  .node--live .node__mark {
     box-shadow:
-      0 0 0 5px var(--color-bg),
-      0 0 18px var(--color-bg),
-      0 0 22px color-mix(in oklab, var(--color-accent) 35%, transparent);
+      0 0 0 1.5px var(--orange),
+      0 0 0 6px var(--color-bg),
+      0 0 22px color-mix(in oklab, var(--orange) 35%, transparent);
   }
-  .node:hover .node__dot {
-    transform: scale(1.4);
+  .node--sketching .node__mark,
+  .node--parked .node__mark {
+    opacity: 0.8;
   }
-  .node--sketching:hover .node__dot,
-  .node--parked:hover .node__dot {
-    background: var(--color-accent);
+  .node:hover .node__mark,
+  .node:focus-visible .node__mark,
+  .node.is-selected .node__mark {
+    opacity: 1;
+    transform: scale(1.08);
+    box-shadow:
+      0 0 0 1.5px var(--cat-text),
+      0 0 0 6px var(--color-bg),
+      0 0 24px color-mix(in oklab, var(--cat) 45%, transparent);
   }
 
   .node__label {
+    position: absolute;
+    top: calc(100% + var(--grid) / 2);
+    left: 50%;
+    translate: -50% 0;
+    width: max-content;
+    max-width: 12rem;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
     text-align: center;
-    max-width: 14rem;
-    text-shadow:
-      0 0 8px var(--color-bg),
-      0 0 16px var(--color-bg),
-      0 0 24px var(--color-bg);
+    pointer-events: none;
   }
   .node__title {
-    font-size: 1.05rem;
-    font-weight: 500;
-    transition: color var(--transition);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    /* a paper halo so the label reads over lines and dots */
+    text-shadow: 0 0 6px var(--color-bg), 0 0 12px var(--color-bg);
   }
-  .node:hover .node__title { color: var(--color-accent); }
+  .node:hover .node__title {
+    color: var(--orange-text);
+  }
+  .node__status {
+    opacity: 0.55;
+  }
+  .node.is-selected .node__label {
+    visibility: hidden; /* the card replaces it */
+  }
 
-  .node__meta {
+  .card {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 2;
+    width: min(18rem, calc(100% - var(--grid) * 2));
+    padding: calc(var(--grid) * 2 / 3);
     display: flex;
-    gap: 8px;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    opacity: 0.7;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: calc(var(--grid) / 3);
+    border: 1px solid color-mix(in oklab, var(--color-fg) 14%, transparent);
+    border-radius: 6px;
+    background: var(--color-bg);
+    box-shadow: 0 12px 32px color-mix(in oklab, var(--ink) 25%, transparent);
   }
-  .node__status { color: var(--color-accent); opacity: 0.9; }
-
-  .node__note {
-    font-size: 0.8rem;
-    color: var(--color-fg);
+  .card[hidden] {
+    display: none;
+  }
+  .card__meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    color: var(--cat-text);
+  }
+  .card__title {
+    font-size: 1.25rem;
+    letter-spacing: -0.02em;
+  }
+  .card__blurb {
     opacity: 0.7;
-    max-width: 12rem;
-    line-height: 1.4;
+    font-size: 0.9375rem;
+  }
+  .card__open {
+    margin-top: calc(var(--grid) / 3);
   }
 
-  @media (max-width: 720px) {
-    .lab-intro { top: calc(var(--space-8) - 1rem); }
-    .node__label { max-width: 9rem; }
-    .node__title { font-size: 0.95rem; }
-    .node__note { font-size: 0.75rem; max-width: 9rem; }
+  @media (max-width: 640px) {
+    .node__status {
+      display: none; /* titles only on phones; the card has the rest */
+    }
+    .node__title {
+      font-size: 0.9375rem;
+    }
+  }
+
+  /* ---- List ---- */
+  .list {
+    padding: calc(var(--grid) * 2) var(--page-margin) calc(var(--grid) * 4);
+    border-top: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 456px), 1fr));
+    gap: calc(var(--grid) * 3) calc(var(--grid) * 2);
   }
 </style>

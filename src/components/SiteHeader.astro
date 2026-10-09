@@ -1,0 +1,439 @@
+---
+// The pinned site header: "made by sam / …" path on the left, nav on the right.
+//
+// The path is a real location, like a folder path. It has two parts:
+//   1. Page crumbs, from the `breadcrumb` prop (e.g. lab / play / dvd-shelf).
+//   2. A section crumb, filled in by the script below as you scroll into any
+//      element with a data-path attribute (e.g. <section data-path="now">).
+//
+// The header also changes how it looks depending on what's behind it,
+// via data-state:
+//   flood  – over a FloodHero: everything ink, no glow, transparent
+//   solid  – scrolled past the flood (or down a normal page): page background
+//   clear  – top of a page with no flood (e.g. the lab map): the old glow
+import ThemeToggle from './ThemeToggle.astro';
+import { CATEGORIES, type CategoryKey } from '../lib/categories';
+
+export interface Crumb {
+  label: string;
+  href?: string;
+  /** Marks a category segment, which takes that category's text colour. */
+  category?: CategoryKey;
+}
+
+interface Props {
+  breadcrumb?: Crumb[];
+}
+
+const { breadcrumb = [] } = Astro.props;
+const parents = breadcrumb.slice(0, -1);
+const page = breadcrumb.at(-1);
+const crumbStyle = (c: Crumb) =>
+  c.category ? `--crumb-color: ${CATEGORIES[c.category].textColor}` : undefined;
+---
+
+<header class="site-header" data-state="clear" data-crumbs={breadcrumb.length}>
+  <nav class="path" aria-label="Breadcrumb">
+    <a href="/" class="brand">made by sam</a>
+    {/* Phones only: like Windows Explorer, hidden levels fold into "…".
+         Tapping it lists them, so nothing is ever unreachable. */}
+    <span class="more">
+      <span class="sep" aria-hidden="true">/</span>
+      <button
+        type="button"
+        class="more__btn"
+        aria-expanded="false"
+        aria-controls="path-more"
+        aria-label="Show the full path"
+      >…</button>
+      <ol class="more__menu" id="path-more" hidden>
+        {parents.map((c) => (
+          <li>
+            {c.href ? (
+              <a href={c.href} class:list={['more__item', { 'crumb--cat': !!c.category }]} style={crumbStyle(c)}>/ {c.label}</a>
+            ) : (
+              <span class:list={['more__item', { 'crumb--cat': !!c.category }]} style={crumbStyle(c)}>/ {c.label}</span>
+            )}
+          </li>
+        ))}
+        {page && (
+          <li data-more-page hidden>
+            <a href={Astro.url.pathname} class="more__item" data-scroll-top>/ {page.label}</a>
+          </li>
+        )}
+      </ol>
+    </span>
+    {breadcrumb.map((c, i) => {
+      const isPage = i === breadcrumb.length - 1;
+      const style = c.category ? `--crumb-color: ${CATEGORIES[c.category].textColor}` : undefined;
+      const classes = ['crumb', { 'crumb--page': isPage, 'crumb--cat': !!c.category }];
+      return (
+        <>
+          <span class:list={['sep', { 'sep--page': isPage }]} aria-hidden="true">/</span>
+          {c.href && !isPage ? (
+            <a href={c.href} class:list={classes} style={style}>{c.label}</a>
+          ) : (
+            <span class:list={classes} style={style} aria-current="page">{c.label}</span>
+          )}
+        </>
+      );
+    })}
+    <span class="sep sep--section" aria-hidden="true" hidden>/</span>
+    <span class="crumb crumb--section" data-section-crumb hidden></span>
+  </nav>
+  <nav class="links" aria-label="Site">
+    <a href="/about" class="underline">about</a>
+    <a href="/lab" class="underline">lab</a>
+    <ThemeToggle />
+  </nav>
+</header>
+
+<style>
+  .site-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    box-sizing: border-box;
+    height: var(--header-h);
+    padding: 0 var(--page-margin);
+    color: var(--color-fg);
+    transition:
+      background-color var(--transition),
+      color var(--transition),
+      border-color var(--transition);
+    border-bottom: 1px solid transparent;
+  }
+
+  /* clear: top of a non-flood page. Soft glow keeps text readable over topo. */
+  .site-header[data-state='clear'] {
+    text-shadow:
+      0 0 6px var(--color-bg),
+      0 0 14px var(--color-bg);
+  }
+  /* flood: ink on the flood colour. */
+  .site-header[data-state='flood'] {
+    color: var(--flood-fg);
+  }
+  /* solid: page background behind the bar once there's content under it. */
+  .site-header[data-state='solid'] {
+    background: color-mix(in oklab, var(--color-bg) 88%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom-color: color-mix(in oklab, var(--color-fg) 12%, transparent);
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+
+  .path {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5em;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .brand {
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    flex-shrink: 0;
+    color: inherit;
+  }
+  .sep {
+    opacity: 0.4;
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+  /* The "…" folder button. Hidden on wide screens, where the full path fits. */
+  .more {
+    display: none;
+    align-items: baseline;
+    gap: 0.5em;
+    flex-shrink: 0;
+  }
+  .more__btn {
+    position: relative;
+    padding: 0 0.15em;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    line-height: 1;
+    color: inherit;
+  }
+  /* Invisible padding so the tap target is ~44px without widening the bar. */
+  .more__btn::after {
+    content: '';
+    position: absolute;
+    inset: -14px -10px;
+  }
+  .more__menu {
+    /* Positioned against the fixed header (not the path, which clips). */
+    position: absolute;
+    top: calc(var(--header-h) - 12px);
+    left: var(--page-margin);
+    margin: 0;
+    padding: 0.35rem;
+    list-style: none;
+    min-width: 12rem;
+    background: var(--color-bg);
+    color: var(--color-fg);
+    text-shadow: none;
+    border: 1px solid color-mix(in oklab, var(--color-fg) 14%, transparent);
+    border-radius: 6px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  }
+  .more__item {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 0.75rem;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: inherit;
+    text-decoration: none;
+  }
+  a.more__item:hover {
+    background: color-mix(in oklab, var(--color-fg) 8%, transparent);
+  }
+  .more__item.crumb--cat {
+    color: var(--crumb-color);
+  }
+
+  .crumb {
+    flex: 0 1 auto;
+    min-width: 3ch; /* long slugs truncate to "palette-ge…" rather than vanish */
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: inherit;
+    text-decoration: none;
+    opacity: 0.65;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: opacity var(--transition), color var(--transition);
+  }
+  a.crumb:hover {
+    opacity: 1;
+  }
+  .crumb--cat {
+    color: var(--crumb-color);
+    opacity: 1;
+  }
+
+  /* The "current" segment is orange: the page crumb, or the section crumb
+     once you've scrolled into a section. */
+  .crumb--page,
+  .crumb--section {
+    color: var(--orange-text);
+    opacity: 1;
+  }
+  .site-header.has-section .crumb--page:not(.crumb--cat) {
+    color: inherit;
+    opacity: 0.65;
+  }
+
+  /* On a flood every segment is ink: orange and category colours would
+     vanish into (or clash with) the flood. Weight carries "current". */
+  .site-header[data-state='flood'] .crumb {
+    color: inherit;
+  }
+  .site-header[data-state='flood'] .crumb--section,
+  .site-header[data-state='flood']:not(.has-section) .crumb--page {
+    opacity: 1;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .site-header[data-state='flood'] :global(a.underline:hover::after) {
+    background: currentColor;
+  }
+  .site-header[data-state='flood'] :global(:focus-visible) {
+    outline-color: var(--flood-fg);
+  }
+
+  .crumb--section.is-new {
+    animation: crumb-in 0.25s ease-out;
+  }
+  @keyframes crumb-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .crumb--section.is-new { animation: none; }
+    .site-header { transition: none; }
+  }
+
+  .links {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: 0.95rem;
+    flex-shrink: 0;
+  }
+
+  /* Narrow screens: "made by sam / … / page" (or "/ … / section").
+     Parent crumbs, and the separator before each, fold into the … menu. */
+  @media (max-width: 640px) {
+    .site-header.has-more .more {
+      display: inline-flex;
+    }
+    .path > .crumb:not(.crumb--page):not(.crumb--section),
+    .path > .sep:not(.sep--page):not(.sep--section) {
+      display: none;
+    }
+    /* Once a section is showing, it replaces the page crumb on phones:
+       "made by sam / … / now" instead of squeezing both in. */
+    .site-header.has-section .crumb--page,
+    .site-header.has-section .sep--page {
+      display: none;
+    }
+    .links {
+      gap: var(--space-2);
+    }
+  }
+</style>
+
+<script>
+  // Re-runs on every page load (the site uses Astro's ClientRouter, which
+  // swaps pages without a full reload), and cleans up before each swap.
+  let cleanup: (() => void) | null = null;
+
+  function initHeader() {
+    cleanup?.();
+    const header = document.querySelector<HTMLElement>('.site-header');
+    if (!header) return;
+
+    const sectionCrumb = header.querySelector<HTMLElement>('[data-section-crumb]')!;
+    const sectionSep = header.querySelector<HTMLElement>('.sep--section')!;
+    const floods = Array.from(document.querySelectorAll<HTMLElement>('.flood'));
+    const sections = Array.from(document.querySelectorAll<HTMLElement>('[data-path]'));
+    const disposers: Array<() => void> = [];
+    const listen = (target: EventTarget, type: string, fn: EventListener, opts?: AddEventListenerOptions) => {
+      target.addEventListener(type, fn, opts);
+      disposers.push(() => target.removeEventListener(type, fn, opts));
+    };
+
+    // 0. The "…" menu (phones) -------------------------------------------
+    const moreBtn = header.querySelector<HTMLButtonElement>('.more__btn')!;
+    const moreMenu = header.querySelector<HTMLElement>('.more__menu')!;
+    const pageItem = header.querySelector<HTMLElement>('[data-more-page]');
+    const crumbCount = Number(header.dataset.crumbs ?? 0);
+
+    const setMenuOpen = (open: boolean, returnFocus = false) => {
+      moreBtn.setAttribute('aria-expanded', String(open));
+      moreMenu.hidden = !open;
+      if (open) moreMenu.querySelector<HTMLElement>('a, span')?.focus?.();
+      else if (returnFocus) moreBtn.focus();
+    };
+    // How many levels are folded away: every parent crumb, plus the page
+    // crumb once a section is showing in its place.
+    const updateMore = (hasSection: boolean) => {
+      const hidden = Math.max(0, crumbCount - 1) + (hasSection && crumbCount > 0 ? 1 : 0);
+      header.classList.toggle('has-more', hidden > 0);
+      if (pageItem) pageItem.hidden = !hasSection;
+      if (!hidden) setMenuOpen(false);
+    };
+    updateMore(false);
+
+    listen(moreBtn, 'click', () => setMenuOpen(moreMenu.hidden));
+    listen(document, 'click', (e) => {
+      if (!moreMenu.hidden && !header.querySelector('.more')!.contains(e.target as Node)) setMenuOpen(false);
+    });
+    listen(document, 'keydown', (e) => {
+      if ((e as KeyboardEvent).key === 'Escape' && !moreMenu.hidden) setMenuOpen(false, true);
+    });
+    listen(moreMenu, 'click', (e) => {
+      const link = (e.target as HTMLElement).closest('a');
+      if (!link) return;
+      if (link.hasAttribute('data-scroll-top')) {
+        e.preventDefault(); // same page: just go back to the top
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      setMenuOpen(false);
+    });
+
+    // 1. Header state ------------------------------------------------------
+    // A page can have more than one flood (the dev playground does), so
+    // track which ones are currently under the header.
+    const floodsUnderHeader = new Set<Element>();
+    const updateState = () => {
+      if (floods.length) header.dataset.state = floodsUnderHeader.size ? 'flood' : 'solid';
+      else header.dataset.state = window.scrollY > 8 ? 'solid' : 'clear';
+    };
+
+    if (floods.length) {
+      // Watch a thin strip at the very top of the viewport (top 6%), which is
+      // where the header sits. While any flood overlaps that strip, the
+      // header is "over the flood".
+      const io = new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            if (e.isIntersecting) floodsUnderHeader.add(e.target);
+            else floodsUnderHeader.delete(e.target);
+          }
+          updateState();
+        },
+        { rootMargin: '0px 0px -94% 0px' },
+      );
+      floods.forEach((f) => io.observe(f));
+      disposers.push(() => io.disconnect());
+    } else {
+      listen(window, 'scroll', () => updateState(), { passive: true });
+    }
+    updateState();
+
+    // 2. Section crumb ----------------------------------------------------
+    // A section counts as "current" while it crosses a line 45% down the
+    // screen. Using a line (not "fully visible") means exactly one section
+    // is current at a time, even when sections are taller than the screen.
+    if (sections.length) {
+      let current = '';
+      const setSection = (name: string) => {
+        if (name === current) return;
+        current = name;
+        const show = name !== '';
+        sectionCrumb.hidden = !show;
+        sectionSep.hidden = !show;
+        header.classList.toggle('has-section', show);
+        updateMore(show);
+        if (show) {
+          sectionCrumb.textContent = name;
+          sectionCrumb.classList.remove('is-new');
+          void sectionCrumb.offsetWidth; // restart the slide-in animation
+          sectionCrumb.classList.add('is-new');
+        }
+      };
+
+      const visible = new Set<HTMLElement>();
+      const io = new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            if (e.isIntersecting) visible.add(e.target as HTMLElement);
+            else visible.delete(e.target as HTMLElement);
+          }
+          // If two sections touch the line at once, the later one in the
+          // document wins (the one you're scrolling into).
+          const active = sections.filter((s) => visible.has(s)).pop();
+          setSection(active?.dataset.path ?? '');
+        },
+        { rootMargin: '-45% 0px -55% 0px' },
+      );
+      sections.forEach((s) => io.observe(s));
+      disposers.push(() => io.disconnect());
+    }
+
+    cleanup = () => {
+      disposers.forEach((d) => d());
+      cleanup = null;
+    };
+  }
+
+  document.addEventListener('astro:page-load', initHeader);
+  document.addEventListener('astro:before-swap', () => cleanup?.());
+</script>

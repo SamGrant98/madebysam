@@ -33,10 +33,15 @@
   --accent-weight: 400;
   --accent-scale: 1.15; /* relative to surrounding Switzer */
 
-  /* grid */
+  /* grid: everything snaps to 24px, measured from the PAGE's top-left.
+     Dots sit on the lines (0, 24, 48…), so edges set in whole cells
+     land on a dot column. */
   --space-unit: 8px;
   --dot-spacing: 24px;
   --dot-size: 1.5px;
+  --grid: var(--dot-spacing);
+  --page-margin: 24px; /* 1 cell on phones, 2 on tablets, 4 on desktop */
+  --header-h: 72px; /* 3 cells */
 
   /* flood: one full-bleed hero per page, everything on it is ink */
   --flood-fg: var(--ink);
@@ -70,6 +75,38 @@
   --cat-movement-text: var(--cat-movement);
   --cat-space-text: var(--cat-space);
   --cat-play-text: var(--cat-play);
+}
+
+@media (min-width: 641px) {
+  :root { --page-margin: 48px; }
+}
+@media (min-width: 1025px) {
+  :root { --page-margin: 96px; }
+}
+
+/* Dev-only grid overlay (press G in `npm run dev`). Lines every 24px from
+   the page's top-left, plus dashed lines at the page margins. */
+html.show-grid body {
+  position: relative;
+}
+html.show-grid body::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgb(255 0 90 / 0.25) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 0 90 / 0.25) 1px, transparent 1px);
+  background-size: var(--grid) var(--grid);
+}
+html.show-grid body::before {
+  content: '';
+  position: fixed;
+  inset: 0 var(--page-margin);
+  z-index: 9999;
+  pointer-events: none;
+  border-inline: 1px dashed rgb(0 200 255 / 0.7);
 }
 
 *,

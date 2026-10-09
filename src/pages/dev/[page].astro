@@ -1,0 +1,85 @@
+---
+// Dev-only playground: every brand component on one page, so each build
+// step can be checked in `npm run dev` at /dev/components.
+//
+// It is never built for the live site: in production getStaticPaths()
+// returns no paths, so Astro generates no page at all.
+import Base from '../../layouts/Base.astro';
+import FloodHero from '../../components/FloodHero.astro';
+import Glyph from '../../components/Glyph.astro';
+import { BRAND, CATEGORIES, CATEGORY_KEYS } from '../../lib/categories';
+
+export function getStaticPaths() {
+  return import.meta.env.DEV ? [{ params: { page: 'components' } }] : [];
+}
+
+const tones = [
+  { key: 'brand' as const, info: BRAND },
+  ...CATEGORY_KEYS.map((key) => ({ key, info: CATEGORIES[key] })),
+];
+---
+
+<Base
+  title="components (dev)"
+  showTopo={false}
+  breadcrumb={[{ label: 'dev', href: '/dev/components' }, { label: 'components' }]}
+>
+  <FloodHero tone="brand" marks="dots">
+    <span slot="eyebrow">dev / components</span>
+    <h1 class="display pg-h1">Every <span class="accent">piece</span>, in one place.</h1>
+    <p class="pg-lede">Scroll down: the header should turn solid after this flood and the path should pick up each section name. Press G to show the grid.</p>
+  </FloodHero>
+
+  <section class="pg-section" data-path="glyphs">
+    <h2 class="display pg-h2">Glyphs</h2>
+    <div class="pg-glyphs">
+      {tones.map(({ key, info }) => (
+        <div class="pg-glyph" style={`color: ${info.color}`}>
+          <Glyph kind={info.glyph} size={40} />
+          <Glyph kind={info.glyph} variant="grid" size={40} />
+          <span class="label" style={`color: ${info.textColor}`}>{key} · {info.glyph}</span>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <section class="pg-section" data-path="type">
+    <h2 class="display pg-h2">Type</h2>
+    <p class="display pg-type-display">Tools you <span class="accent">play</span>, not just use.</p>
+    <p class="pg-body">Body copy in Switzer. I design and develop across a broad range of disciplines: websites, mobile apps, VR experiences, web AR, exhibitions and installations.</p>
+    <p class="label">made by sam / lab / play / dvd-shelf · status live · 0123456789</p>
+  </section>
+
+  <section class="pg-section pg-section--flush" data-path="floods">
+    <h2 class="display pg-h2 pg-pad">Floods</h2>
+    {CATEGORY_KEYS.map((key) => (
+      <FloodHero tone={key} live={key === 'play'} class="pg-flood">
+        <span slot="eyebrow">lab / {key} / example</span>
+        <h3 class="display pg-h3">{CATEGORIES[key].label}</h3>
+        <span slot="meta" class="flood-tag">{key}</span>
+      </FloodHero>
+    ))}
+  </section>
+</Base>
+
+<style>
+  .pg-h1 { font-size: clamp(2.6rem, 7vw, 6rem); margin: 0; max-width: 14ch; }
+  .pg-lede { margin: 0; font-size: 1.1rem; max-width: 40ch; }
+  .pg-section {
+    padding: calc(var(--grid) * 3) var(--page-margin);
+    border-top: 1px solid color-mix(in oklab, var(--color-fg) 12%, transparent);
+    display: flex;
+    flex-direction: column;
+    gap: var(--grid);
+    min-height: round(down, 70svh, var(--grid));
+  }
+  .pg-section--flush { padding-inline: 0; padding-bottom: 0; }
+  .pg-pad { padding-inline: var(--page-margin); }
+  .pg-h2 { font-size: clamp(2rem, 4vw, 3rem); margin: 0; }
+  .pg-h3 { font-size: clamp(2rem, 5vw, 4rem); margin: 0; }
+  .pg-glyphs { display: flex; flex-wrap: wrap; gap: var(--grid) calc(var(--grid) * 2); }
+  .pg-glyph { display: flex; align-items: center; gap: var(--space-2); }
+  .pg-type-display { font-size: clamp(2.4rem, 6vw, 5rem); margin: 0; }
+  .pg-body { max-width: 60ch; margin: 0; }
+  :global(.pg-flood) { min-height: calc(var(--grid) * 12); }
+</style>

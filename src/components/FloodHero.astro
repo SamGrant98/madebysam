@@ -44,7 +44,10 @@ const hasMeta = Astro.slots.has('meta') || live;
 >
   <svg class="flood__grid" aria-hidden="true">
     <defs>
-      <pattern id={patternId} width="24" height="24" patternUnits="userSpaceOnUse">
+      {/* x/y = -12 puts glyph centres on the grid lines for a flood at the
+          top-left of the page. The script below corrects it for floods
+          further down. */}
+      <pattern id={patternId} x="-12" y="-12" width="24" height="24" patternUnits="userSpaceOnUse" data-flood-pattern>
         <g class="flood__mark">
           <Glyph kind={kind} variant="grid" size={24} />
         </g>
@@ -69,13 +72,47 @@ const hasMeta = Astro.slots.has('meta') || live;
   </div>
 </section>
 
+<script>
+  // Keep every flood's dots on the PAGE grid, wherever the flood sits.
+  // An SVG pattern tiles from the SVG's own corner, so a flood that starts
+  // at y = 830 would be 830 % 24 = 14px out of step. Shift each pattern's
+  // origin by the flood's position on the page to cancel that out.
+  const GRID = 24;
+  function alignFloods() {
+    document.querySelectorAll<SVGPatternElement>('[data-flood-pattern]').forEach((pattern) => {
+      const flood = pattern.closest('.flood');
+      if (!flood) return;
+      const r = flood.getBoundingClientRect();
+      const left = r.left + window.scrollX;
+      const top = r.top + window.scrollY;
+      // -12: glyphs are drawn centred in their 24px tile; dots belong ON the lines.
+      pattern.setAttribute('x', String(-((left + GRID / 2) % GRID)));
+      pattern.setAttribute('y', String(-((top + GRID / 2) % GRID)));
+    });
+  }
+
+  let observer: ResizeObserver | null = null;
+  document.addEventListener('astro:page-load', () => {
+    alignFloods();
+    document.fonts?.ready.then(alignFloods); // web fonts can shift layout
+    // Anything that changes the page's height can move floods further down.
+    observer?.disconnect();
+    observer = new ResizeObserver(alignFloods);
+    observer.observe(document.body);
+  });
+  document.addEventListener('astro:before-swap', () => observer?.disconnect());
+</script>
+
 <style>
   .flood {
     position: relative;
     isolation: isolate; /* keeps the grid's z-index local to the hero */
     background: var(--flood-bg);
     color: var(--flood-fg);
-    min-height: min(78svh, 680px); /* svh: stable on mobile, unlike vh */
+    /* svh: stable on mobile, unlike vh. round() snaps it to whole cells so
+       whatever follows the flood starts on a grid line. */
+    min-height: min(78svh, 680px);
+    min-height: round(down, min(78svh, 680px), var(--grid));
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
@@ -96,9 +133,10 @@ const hasMeta = Astro.slots.has('meta') || live;
   .flood__content {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
-    padding: calc(var(--space-8) + var(--space-4)) clamp(1.25rem, 4vw, 3rem)
-      clamp(2rem, 5vw, 3.5rem);
+    gap: var(--grid);
+    /* Whole cells only: header + 2 cells on top, 3 at the bottom, and the
+       page margin at the sides, so text edges sit on dot columns. */
+    padding: calc(var(--header-h) + var(--grid) * 2) var(--page-margin) calc(var(--grid) * 3);
     max-width: 80rem;
   }
 

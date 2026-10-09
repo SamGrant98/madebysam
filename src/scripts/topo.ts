@@ -34,6 +34,10 @@ const fragment = /* glsl */ `
   uniform int   uPeakCount;
   uniform float uPeakAA;           // line widening near peak (faded by morph)
   uniform float uMorph;            // 0 = topo, 1 = grid
+  uniform float uDpr;              // device pixel ratio
+  uniform float uScroll;           // window.scrollY, CSS px
+  uniform float uGrid;             // grid size, CSS px (24)
+  uniform float uDotR;             // dot radius, CSS px
 
   vec2 hash2(vec2 p) {
     p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
@@ -108,19 +112,20 @@ const fragment = /* glsl */ `
       fbm(distortUv),
       fbm(distortUv + vec2(7.13, 3.41))
     ) * 80.0 * distortFactor;
-    vec2 fragD = gl_FragCoord.xy + distortAmt;
-
-    float gridSpacing = 80.0;
-    vec2 gPx = mod(fragD, gridSpacing);
-    vec2 gNear = min(gPx, gridSpacing - gPx);
-    float gridMinor = 1.0 - smoothstep(0.0, 1.0, min(gNear.x, gNear.y));
-
-    float majorSpacing = gridSpacing * 5.0;
-    vec2 gPxM = mod(fragD, majorSpacing);
-    vec2 gNearM = min(gPxM, majorSpacing - gPxM);
-    float gridMajor = 1.0 - smoothstep(0.0, 1.5, min(gNearM.x, gNearM.y));
-
-    float gridFull = max(gridMinor * 0.32, gridMajor * 0.55);
+    // ---- Dot grid ----
+    // The SAME 24px dot grid as the rest of the site, so content lines up
+    // with it. Three conversions make that work:
+    //   1. GL measures from the bottom-left in device pixels; the page
+    //      measures from the top-left in CSS pixels. Flip y, divide by DPR.
+    //   2. Add the scroll offset, so the grid is pinned to the PAGE and
+    //      moves with the content instead of sitting still behind it.
+    //   3. Dots sit ON the grid lines (0, 24, 48…), not mid-cell, so an
+    //      element at 48px from the edge lands exactly on a dot column.
+    vec2 cssPx = vec2(gl_FragCoord.x, uResolution.y - gl_FragCoord.y) / uDpr;
+    vec2 pagePx = cssPx + vec2(0.0, uScroll) + distortAmt / uDpr;
+    vec2 toDot = pagePx - uGrid * floor(pagePx / uGrid + 0.5); // offset from nearest dot
+    float dotMask = 1.0 - smoothstep(uDotR - 0.6, uDotR + 0.6, length(toDot));
+    float gridFull = dotMask * 0.32;
 
     // ---- Blend ----
     // Topo fades out earlier; grid begins emerging (with heavy wobble) just
@@ -187,6 +192,10 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
       uPeakCount: { value: 1 },
       uPeakAA: { value: DEFAULT_PEAK_AA },
       uMorph: { value: 0 },
+      uDpr: { value: renderer.dpr },
+      uScroll: { value: 0 },
+      uGrid: { value: 24 },
+      uDotR: { value: 1.5 },
     },
   });
   const mesh = new Mesh(gl, { geometry, program });
@@ -196,6 +205,7 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
     const h = window.innerHeight;
     renderer.setSize(w, h);
     program.uniforms.uResolution.value = [w * renderer.dpr, h * renderer.dpr];
+    program.uniforms.uDpr.value = renderer.dpr;
   }
   resize();
   window.addEventListener('resize', resize);
@@ -279,6 +289,7 @@ export function initTopoCanvas(canvas: HTMLCanvasElement): () => void {
 
     program.uniforms.uPeaks.value = peakUniform;
     program.uniforms.uMorph.value = morphValue;
+    program.uniforms.uScroll.value = window.scrollY;
     program.uniforms.uTime.value = (performance.now() - start) / 1000;
 
     renderer.render({ scene: mesh });

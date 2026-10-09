@@ -32,7 +32,8 @@ const ogImage = data.screenshot
   ogImage={ogImage}
   breadcrumb={[
     { label: 'lab', href: '/lab' },
-    { label: data.title },
+    { label: data.category, category: data.category },
+    { label: entry.id }, // the slug: paths show the real location, e.g. dvd-shelf
   ]}
 >
   <article class="demo">

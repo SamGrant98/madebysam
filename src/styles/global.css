@@ -151,6 +151,41 @@ h3 {
   line-height: 1.1;
 }
 
+/* Type roles (BRAND.md › Type) ---------------------------------------- */
+
+/* Big headlines: Switzer Black, tight. */
+.display {
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-tracking);
+  line-height: 0.95;
+  text-wrap: balance;
+}
+
+/* Melodrama accent. Sized relative to the surrounding text (em), so one
+   word inside a .display headline scales with the headline. Use for one
+   word in a headline, big numbers, or one voice line per page. */
+.accent {
+  font-family: var(--font-accent);
+  font-weight: var(--accent-weight);
+  font-size: calc(var(--accent-scale) * 1em);
+  letter-spacing: -0.01em;
+}
+
+/* Small mono label: paths, tags, metadata. */
+.label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+}
+
+/* Tag on a flood: ink outline, ink text. */
+.flood-tag {
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  padding: 0.1em 0.6em;
+}
+
 code,
 pre {
   font-family: var(--font-mono);

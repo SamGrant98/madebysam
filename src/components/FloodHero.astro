@@ -1,0 +1,143 @@
+---
+// A full-bleed hero in one colour: a category's signal colour, or brand
+// orange. One per page, at the top (see BRAND.md › Flood).
+//
+// Everything on a flood is ink (--flood-fg): text, the accent word, tags,
+// marks. The background grid uses the same Glyph geometry as everywhere
+// else, repeated as an SVG pattern, so it costs nothing at runtime and
+// works without JavaScript. The interactive "lit" layer (cursor, tilt,
+// tap) will sit on top of this later as a separate component.
+//
+// Usage:
+//   <FloodHero tone="play" live>
+//     <span slot="eyebrow">lab / play / dvd-shelf</span>
+//     <h1 class="display">DVD Shelf</h1>
+//     <p>A 3D shelf for your physical media.</p>
+//     <Fragment slot="meta"><span class="flood-tag">play</span></Fragment>
+//   </FloodHero>
+import Glyph from './Glyph.astro';
+import { BRAND, CATEGORIES, type CategoryKey } from '../lib/categories';
+
+interface Props {
+  /** Which colour floods: a category, or 'brand' for orange (home, about). */
+  tone: CategoryKey | 'brand';
+  /** Background marks: the tone's glyph (default) or plain dots. */
+  marks?: 'glyphs' | 'dots';
+  /** Show the live marker (an ink ring) in the meta row. */
+  live?: boolean;
+  class?: string;
+}
+
+const { tone, marks = 'glyphs', live = false, class: className } = Astro.props;
+const info = tone === 'brand' ? BRAND : CATEGORIES[tone];
+const kind = marks === 'glyphs' ? info.glyph : 'dot';
+
+// SVG pattern ids are global to the whole page, so give each flood its own.
+const patternId = `flood-grid-${tone}-${Math.random().toString(36).slice(2, 8)}`;
+const hasMeta = Astro.slots.has('meta') || live;
+---
+
+<section
+  class:list={['flood', className]}
+  style={`--flood-bg: ${info.color}`}
+  data-tone={tone}
+>
+  <svg class="flood__grid" aria-hidden="true">
+    <defs>
+      <pattern id={patternId} width="24" height="24" patternUnits="userSpaceOnUse">
+        <g class="flood__mark">
+          <Glyph kind={kind} variant="grid" size={24} />
+        </g>
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill={`url(#${patternId})`}></rect>
+  </svg>
+
+  <div class="flood__content">
+    {Astro.slots.has('eyebrow') && (
+      <div class="flood__eyebrow"><slot name="eyebrow" /></div>
+    )}
+    <slot />
+    {hasMeta && (
+      <div class="flood__meta">
+        {live && (
+          <span class="flood__live"><i aria-hidden="true"></i>live</span>
+        )}
+        <slot name="meta" />
+      </div>
+    )}
+  </div>
+</section>
+
+<style>
+  .flood {
+    position: relative;
+    isolation: isolate; /* keeps the grid's z-index local to the hero */
+    background: var(--flood-bg);
+    color: var(--flood-fg);
+    min-height: min(78svh, 680px); /* svh: stable on mobile, unlike vh */
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+
+  .flood__grid {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    color: var(--flood-fg);
+  }
+  .flood__mark {
+    opacity: var(--flood-mark-opacity);
+  }
+
+  .flood__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: calc(var(--space-8) + var(--space-4)) clamp(1.25rem, 4vw, 3rem)
+      clamp(2rem, 5vw, 3.5rem);
+    max-width: 80rem;
+  }
+
+  .flood__eyebrow,
+  .flood__meta {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+  .flood__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-3);
+  }
+
+  .flood__live {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+  }
+  .flood__live i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1.5px var(--flood-fg); /* ink ring: orange vanishes on an orange flood */
+  }
+
+  /* Everything inside inherits ink. :global() reaches slotted content. */
+  .flood :global(a) {
+    color: inherit;
+  }
+  /* The site's default focus ring is orange, which disappears on the
+     orange flood and is weak on yellow. On any flood it becomes ink. */
+  .flood :global(:focus-visible) {
+    outline-color: var(--flood-fg);
+  }
+  /* Base.astro gives headings a bg-coloured glow so they read over the
+     topo lines. A flood has no topo behind it, so switch the glow off. */
+  .flood :global(:where(h1, h2, h3, p)) {
+    text-shadow: none;
+  }
+</style>
